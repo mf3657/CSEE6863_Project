@@ -61,7 +61,7 @@ module instr_and_data_mem (clk, prog_ctr, instr_mem_out, data_rd_addr, data_wr_a
 // load program into memory 
 	initial
 	begin
-	$readmemh("C:/Users/ekstep1/Desktop/verlog/run/program2.txt",instr_mem);
+	$readmemh("../tb/program1.txt",instr_mem);
 	end
 
 // read instructions from memory
@@ -75,7 +75,7 @@ module instr_and_data_mem (clk, prog_ctr, instr_mem_out, data_rd_addr, data_wr_a
 // initialize data memory from file
 	initial
 	begin
-	$readmemh("C:/Users/ekstep1/Desktop/verlog/run/data2.txt",data_mem);
+	$readmemh("../data1.txt",data_mem);
 	end
                                                      
 // get data during LOAD instruction                 
