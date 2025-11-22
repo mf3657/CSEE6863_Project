@@ -1,6 +1,6 @@
 # ------------------------------------------
 # CSEE6863 - Columbia University
-# FIFO example FPV introduction
+# 8 bit RISC Processor Verification Project
 # Hardware group 1
 # 	- Michael John Flynn: mf3657
 # 	- Felipe Andrade: fga2116
@@ -10,7 +10,10 @@
 set ROOT_PATH ../design
 
 analyze -sv \
-	${ROOT_PATH}/proc.v
+	${ROOT_PATH}/processor_top.v \
+	${ROOT_PATH}/processor_core.v \
+	${ROOT_PATH}/instr_and_data_mem.v \
+	${ROOT_PATH}/register_file.v
 
 # We will place assertions directly into our .sv
 # But if using .sva files use the following

@@ -1,96 +1,13 @@
-module testbench;
-reg clk, reset;
-
-initial
-	begin
-	clk = 1'b0;
-	reset = 1'b1;
-	reset = #161 1'b0;
-	end
-
-always clk = #5 ~clk;
-
-processor_top proc_top1(clk, reset);
-
-endmodule
-
-
-module processor_top (clk, reset);
-
-	input clk, reset;
-
-	wire 	 clk, store_to_mem,reg_wr_en;
-	wire [9:0]  prog_ctr;
-	wire	[15:0] instr_mem_out;
-	wire	[2:0]  op1_addr, op2_addr,destination_reg_addr;
-	wire [7:0]  op1_rd_data, op2_rd_data, mem_data;
-	wire [7:0]  data_rd_addr, data_wr_addr;
- 	wire [7:0]  datamem_rd_data, datamem_wr_data;
-	wire [7:0]  operation_result; 
-
- 
-	instr_and_data_mem  mem1(clk, prog_ctr, instr_mem_out, data_rd_addr, data_wr_addr, datamem_rd_data, datamem_wr_data, store_to_mem);
-
-	processor_core proc1(clk,reset,op1_rd_data,op2_rd_data, instr_mem_out,op1_addr, op2_addr,prog_ctr, store_to_mem, reg_wr_en, data_rd_addr, data_wr_addr, datamem_rd_data, datamem_wr_data, operation_result, destination_reg_addr );
-
-	register_file regfile1(clk, reset, datamem_wr_data, op1_rd_data, op2_rd_data, op1_addr, op2_addr, destination_reg_addr, reg_wr_en);
-
-endmodule
-	
-
-module instr_and_data_mem (clk, prog_ctr, instr_mem_out, data_rd_addr, data_wr_addr, datamem_rd_data, datamem_wr_data, store_to_mem);
-
-	input clk;
-	input [9:0] prog_ctr;
-	input [7:0] data_rd_addr, datamem_wr_data;
-	input [7:0] data_wr_addr;
-	input store_to_mem;  
-                                     
-	output [15:0] instr_mem_out;
-	output [7:0] datamem_rd_data;
-
-	reg [15:0]	instr_mem_out;              
-	reg [7:0]	datamem_rd_data;
-
-
-
-// instruction memory operations
-	reg [15:0] instr_mem[0:1023];
-
-	
-// load program into memory 
-	initial
-	begin
-	$readmemh("../tb/program1.txt",instr_mem);
-	end
-
-// read instructions from memory
-	always @(posedge clk)
-		instr_mem_out <=  #1 instr_mem[prog_ctr];
-
-
-// data memory operations
-	reg [7:0] data_mem[255:0];
-
-// initialize data memory from file
-	initial
-	begin
-	$readmemh("../data1.txt",data_mem);
-	end
-                                                     
-// get data during LOAD instruction                 
-	always @(data_rd_addr)
-		datamem_rd_data <= data_mem[data_rd_addr]; 
-                                                      
-// write to data memory in STORE instruction
-	always @(posedge clk)
-		if (store_to_mem == 1'b1)
-			data_mem[data_wr_addr] <= datamem_wr_data;
-
-endmodule
-
-
-module processor_core (clk,reset,op1_rd_data,op2_rd_data, instr_mem_out,op1_addr,op2_addr,prog_ctr,store_to_mem, reg_wr_en, data_rd_addr, data_wr_addr, datamem_rd_data, datamem_wr_data, operation_result,destination_reg_addr);               
+module processor_core (clk, reset, 
+					   op1_rd_data, op2_rd_data, 
+					   instr_mem_out,
+					   op1_addr, op2_addr,
+					   prog_ctr, store_to_mem, 
+					   reg_wr_en, 
+					   data_rd_addr, data_wr_addr, 
+					   datamem_rd_data, datamem_wr_data, 
+					   operation_result, 
+					   destination_reg_addr);               
 
 	input	clk, reset;
 	input [7:0]  op1_rd_data, op2_rd_data;
@@ -678,34 +595,5 @@ always @(posedge clk)
 			end
 
 	   end
-
-endmodule
-
-
-module register_file (clk, reset, wr_data, rd_data1, rd_data2, rd_addr1, rd_addr2, wr_addr, wr_en);
-
-	input clk, reset;
-	input [7:0] wr_data;
-	input [2:0] rd_addr1, rd_addr2, wr_addr;
-	input		 wr_en;
-	output[7:0] rd_data1, rd_data2;
-
-	reg [7:0] rd_data1, rd_data2;
-
-
-//	register file
-	reg [7:0] reg_file [7:0];
-                                         	
-	always @(rd_addr1 or rd_addr2 or reset or wr_en or wr_data)
-		begin
-		rd_data1 <= reg_file[rd_addr1];
-		rd_data2 <= reg_file[rd_addr2];
-		end
-
-always @(posedge clk)	
-		begin
-		if (wr_en == 1)
-			reg_file[wr_addr] <= #1 wr_data;
-		end
 
 endmodule
