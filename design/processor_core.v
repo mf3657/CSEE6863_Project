@@ -9,29 +9,51 @@ module processor_core (clk, reset,
 					   operation_result, 
 					   destination_reg_addr);               
 
-	input	clk, reset;
-	input [7:0]  op1_rd_data, op2_rd_data;
-	input [7:0]  datamem_rd_data;
-	input [15:0] instr_mem_out;
+//***************************
+//	INPUTS
+//****************************
+	input wire	clk, reset;
 
-	output [2:0] op1_addr, op2_addr;
-	output [9:0] prog_ctr;
-	output [7:0] datamem_wr_data;
-	output [7:0] data_rd_addr, data_wr_addr;
-	output [7:0] operation_result;
-	output [2:0] destination_reg_addr;
-	output 	     store_to_mem, reg_wr_en;
+	input wire [7:0]  op1_rd_data, op2_rd_data;
+	input wire [7:0]  datamem_rd_data;
+	input wire [15:0] instr_mem_out;
 
-	reg [2:0] op1_addr, op2_addr, op1_addr_reg , op2_addr_reg;
+//***************************
+//	OUTPUTS (and associated)
+//****************************
+	output reg [2:0] op1_addr, op2_addr;
+           reg [2:0] op1_addr_reg , op2_addr_reg;
+
+	output reg [9:0] prog_ctr;
+           reg [9:0] branch_addr, nxt_prog_ctr;
+
+	output reg [7:0] data_rd_addr, data_wr_addr;
+	output reg [7:0] operation_result;
+    
+	output reg [2:0] destination_reg_addr;
+
+    output wire [7:0] datamem_wr_data;
+           wire [7:0] data_out;
+	
+    output wire  store_to_mem, reg_wr_en;
+	       wire	 invalidate_instr;
+
+//**********************************
+//	INTERNAL SIGNALS AND REGISTERS
+//**********************************
+	wire [7:0] operand1, operand2;
+	wire [7:0] op1_data, op2_data, branch_taken;
+	wire		carry_out,save_carry_flag;
+	wire		gt_flag_ex, lt_flag_ex, eq_flag_ex;
+	wire		gt_flag_true, lt_flag_true, eq_flag_true;
+	wire		carry_flag_true;
+
 	reg [9:0] branch_addr,prog_ctr,nxt_prog_ctr;
 	reg [9:0] nxt_prog_ctr_reg, nxt_prog_ctr_r2;
 	reg [7:0] op1_data_reg, op2_data_reg; 
-	reg [7:0] operation_result,data_rd_addr;
 	reg [15:0] instruction;
 	reg [4:0] opcode;
 	reg [7:0] ld_mem_addr;
-	reg [7:0] data_wr_addr;
-	reg [2:0] destination_reg_addr ;
 	reg [7:0] logical_data_out;
 	reg [7:0] data_in1,data_in2;
 	reg [7:0] ld_mem_addr_reg;
@@ -40,7 +62,7 @@ module processor_core (clk, reset,
 	reg [7:0] st_mem_addr, st_mem_addr_reg;
 	reg		add_op_true, carry_in, en_op2_complement;
 	reg		and_op_true, or_op_true, not_op_true;
-	reg	     	jump_true, shift_left_true,store_to_mem_ex ;
+	reg	    jump_true, shift_left_true,store_to_mem_ex ;
 	reg		add_op_true_reg, carry_in_reg;
 	reg		en_op2_complement_reg,jump_true_reg;       
 	reg		and_op_true_reg,or_op_true_reg,not_op_true_reg;
@@ -74,28 +96,21 @@ module processor_core (clk, reset,
 	reg		jump_gt_reg, jump_lt_reg, jump_eq_reg;
 	reg		jump_carry_reg;
 
-	wire [7:0] datamem_wr_data, data_out;
-	wire [7:0] operand1, operand2;
-	wire [7:0] op1_data, op2_data, branch_taken;
-	wire		carry_out,save_carry_flag;
-	wire		invalidate_instr, store_to_mem, reg_wr_en;
-	wire		gt_flag_ex, lt_flag_ex, eq_flag_ex;
-	wire		gt_flag_true, lt_flag_true, eq_flag_true;
-	wire		carry_flag_true;
+
 
 
 //****************************************
-//   RESET INITIALUZATION
+//   RESET INITIALIZATION
 //****************************************
 
 //keep instruction and program counter at zero during reset
 //Disable register and memory writes during reset
 	always @(reset)
-	   if (reset == 1'b1)                          
-		begin
-		prog_ctr <= 10'b0;
-		instruction <= 16'b0;
-		end
+	    if (reset == 1'b1)                          
+		    begin
+		        prog_ctr <= 10'b0;
+		        instruction <= 16'b0;
+		    end
 
 //****************************************
 //	INSTRUCTION FETCH PIPELINE REGISTERS
@@ -103,182 +118,285 @@ module processor_core (clk, reset,
                                                    
 	always @(posedge clk)
 		if (reset == 1'b1)
-		   begin
-		   instruction <= 16'b0;
-		   invalidate_fetch_instr <= 1'b0;
-		   end
+		    begin
+		        instruction <= 16'b0;
+		        invalidate_fetch_instr <= 1'b0;
+		    end
 		else
-		   begin
-		   instruction <= #1 instr_mem_out;
-		   if (branch_taken_reg == 1'b1)
-			invalidate_fetch_instr <= #1 1'b1;
-		   else
-			invalidate_fetch_instr <= #1 1'b0;
-
-		   end
+		    begin
+		        instruction <= #1 instr_mem_out;
+		        if (branch_taken_reg == 1'b1)
+			        invalidate_fetch_instr <= #1 1'b1;
+		        else
+			        invalidate_fetch_instr <= #1 1'b0;
+		    end
 
                                              
 //***************************
 //	INSTRUCTION DECODE LOGIC
 //****************************
+
+/*
+The instruction word is 16 bits wide. During the Decode (ID)
+pipeline stage, the instruction is split into several fields. 
+Each field may be interpreted differently depending on the 
+instruction type (ALU, LOAD, STORE, BRANCH). The decode logic
+extracts all fields unconditionally, simplifying later pipeline
+stages, which can ignore fields that are not relevant to the
+current instruction.
+
+
+ALU OPERATIONS (ADD, SUB, AND, OR, ...)
+15         11 10      8 7    6 5     4 3    2 1       0
++------------+---------+------+-------+------+--------+
+|   opcode   | res_reg | XXX  | op2_r | XXX  | op1_r  |
++------------+---------+------+-------+------+--------+
+opcode → ALU operation
+res_reg → destination register
+op2_r → second operand register
+op1_r → first operand register
+X = unused/don’t care
+
+
+LOAD INSTRUCTION
+15         11 10      8 7                                  0
++------------+---------+-----------------------------------+
+|   opcode   | res_reg |         immediate addr            |
++------------+---------+-----------------------------------+
+load from instruction[7:0] into register instruction[10:8]
+
+
+STORE INSTRUCTION
+15         11 10                                  3 2       0
++------------+-------------------------------------+--------+
+|   opcode   |       store memory address          | op1_r  |
++------------+-------------------------------------+--------+
+store register op1_r -> memory address [10:3]
+no destination register
+
+
+BRANCH INSTRUCTION
+15         11 10                                       0
++------------+-----------------------------------------+
+|   opcode   |              branch target              |
++------------+-----------------------------------------+
+branch_addr is 10 bits -> 1024-entry address space
+
+*/
+
 	always@(instruction)
 		begin
-		opcode	<=  instruction[15:11];
-		op1_addr	<=  instruction[2:0];
-		op2_addr	<= instruction[6:4];
-		res_addr	<= instruction[10:8];
-		ld_mem_addr <= instruction[7:0];
-		st_mem_addr <= instruction [10:3];
-		branch_addr <= instruction[9:0];
+		    // ------------ Opcode ------------
+            opcode       <= instruction[15:11];
+
+            // ------------ Register fields ------------
+            op1_addr     <= instruction[2:0];
+            op2_addr     <= instruction[6:4];
+            res_addr     <= instruction[10:8];
+
+            // ------------ Memory Addresses ------------
+            ld_mem_addr  <= instruction[7:0];     // LOAD only
+            st_mem_addr  <= instruction[10:3];    // STORE only
+
+            // ------------ Branch Target ------------
+            branch_addr  <= instruction[9:0];
 		end
+
+//--------------------------------------------------------
+// Default all control signals (no operation)
+//--------------------------------------------------------
+/*
+The control unit is implemented as a combinational opcode 
+decoder. Given the 5-bit opcode extracted during the 
+instruction decode stage, it generates ALU control signals, 
+memory access enables, branch and jump controls, and the 
+register file write-enable flag.
+
+All control signals are defaulted to zero (NOP behaviour). 
+The case statement assigns the minimum required set of 
+signals for each opcode. This implements a classic 
+hardwired control-path microarchitecture.
+*/
 
 	always@ (opcode or branch_addr)        
 		begin
-		add_op_true <= 1'b0;
-		and_op_true <= 1'b0;
-		or_op_true  <= 1'b0;
-		not_op_true <= 1'b0; 
-		carry_in	<= 1'b0;
-		en_op2_complement  <= 1'b0;
-		jump_true	<= 1'b0;
-		compare_true <= 1'b0;
-		shift_left_true <= 1'b0;
-		lgcl_or_bitwse_T <= 1'b0;
-		load_true <= 1'b0;
-		store_true <= 1'b0;
-		write_to_regfile <= 1'b0;
-		unconditional_jump <= 1'b0;
-		jump_gt <= 1'b0;
-		jump_lt <= 1'b0;
-		jump_eq <= 1'b0;
-		jump_carry <= 1'b0;
 
-		case (opcode)
-		//	OP_NOP:  
-		//	5'h00:   	;		
-		
-		//	OP_ADD:	begin
-			5'h01:	begin
-					write_to_regfile <= 1'b1;
-					add_op_true <= 1'b1;
-					end
-	
-		//	OP_SUB:	begin
-			5'h02:	begin
-					add_op_true <= 1'b1;	
-					carry_in	<= 1'b1;
-					en_op2_complement <= 1'b1;
-					write_to_regfile <= 1'b1;
-				   	end
+            // ALU CONTROL SIGNALS
+            add_op_true         <= 1'b0; // enable ALU add/subtract unit
+            and_op_true         <= 1'b0; // enable AND operation
+            or_op_true          <= 1'b0; // enable OR operation
+            not_op_true         <= 1'b0; // enable NOT operation
+            shift_left_true     <= 1'b0; // perform logical shift left
 
-		//	OP_AND:	begin
-			5'h03:	begin
-					and_op_true <= 1'b1;
-					lgcl_or_bitwse_T <= 1'b1;
-					write_to_regfile <= 1'b1;     
-					end
+            // bitwise versions of logical signals above
+            add_bitwise_true    <= 1'b0;
+            and_bitwise_true    <= 1'b0;
+            or_bitwise_true     <= 1'b0;
+            not_bitwise_true    <= 1'b0;
 
-		//	OP_OR:	begin
-			5'h04:	begin
-					or_op_true <= 1'b1;
-					lgcl_or_bitwse_T <= 1'b1;
-					write_to_regfile <= 1'b1;
-					end
+            lgcl_or_bitwse_T    <= 1'b0; // select logical v.s bitwise ALU mode
+            en_op2_complement   <= 1'b0; // inverted operand 2 (for SUB an COMPARE)
+            carry_in            <= 1'b0; // Used for subtracting (SUB)
 
-		//	OP_NOT:	begin
-			5'h05:	begin
-					not_op_true <= 1'b1;
-					lgcl_or_bitwse_T <= 1'b1;
-					write_to_regfile <= 1'b1;
-					end
+            // MEMORY / REGFILE CONTROL SIGNALS
+            load_true           <= 1'b0; // LOAD instr
+            store_true          <= 1'b0; // STORE instr
+            write_to_regfile    <= 1'b0; // write ALU or LOAD result to reg file
 
-		//	OP_SHL	begin                  
-			5'h06:	begin
-					shift_left_true <= 1'b1;
-					write_to_regfile <= 1'b1;
-					end
+            // BRANCH / JUMP CONTROL SIGNALS
+            jump_true           <= 1'b0; // Program counter should be updates
+            unconditional_jump  <= 1'b0; // used for JMP
+            jump_gt             <= 1'b0; // conditional greater than
+            jump_lt             <= 1'b0; // conditional less than
+            jump_eq             <= 1'b0; // conditional equal to
+            jump_carry          <= 1'b0; // conditional carry
 
-		//	OP_JMP:	begin
-			5'h07:	begin
-					nxt_prog_ctr <= branch_addr;
-					jump_true	<= 1'b1;
-					unconditional_jump <= 1'b1;
-					end
+            nxt_prog_ctr        <= 10'b0; // Program counter branch target
 
-		//	OP_LOAD:	begin
-			5'h08:	begin
-					load_true <= 1'b1;
-					write_to_regfile <= 1'b1;
-					end                      
-                                                      
-		//	OP_STORE:	store_true <= 1'b1;
-			5'h09:	store_true <= 1'b1;
+            //--------------------------------------------------------
+            // Opcode decoding
+            //--------------------------------------------------------
+            case (opcode)
 
-		//	OP_ANDBIT:	begin
-			5'h0a:	begin
-					and_bitwise_true <= 1'b1;
-					lgcl_or_bitwse_T <= 1'b1;
-					write_to_regfile <= 1'b1; 
-			   		end
-
-		//	OP_ORBIT:	begin
-			5'h0b:	begin
-					or_bitwise_true <= 1'b1;
-					lgcl_or_bitwse_T <= 1'b1;
-					write_to_regfile <= 1'b1;
-					end
-
-		//	OP_NOTBIT:	begin
-			5'h0c:	begin
-					not_bitwise_true <= 1'b1;
-					lgcl_or_bitwse_T <= 1'b1;
-					write_to_regfile <= 1'b1;
-					end
- 
-		//	OP_COMPARE: begin
-			5'h0d:	begin
-					add_op_true <= 1'b1;
-					compare_true <= 1'b1;	
-					carry_in	<= 1'b1;   //subtract
-					en_op2_complement <= 1'b1;
-				   	end
-
-		//	OP_JMPGT:	begin
-			5'h0e:	begin
-					nxt_prog_ctr <= branch_addr;
-					jump_true	<= 1'b1;
-					jump_gt <= 1'b1;
-					end
-
-		//	OP_JMPLT:	begin
-			5'h0f:	begin
-					nxt_prog_ctr <= branch_addr;
-					jump_true	<= 1'b1;
-					jump_lt <= 1'b1;
-					end
-		//	OP_JMPEQ:	begin
-			5'h10:	begin
-					nxt_prog_ctr <= branch_addr;
-					jump_true	<= 1'b1;
-					jump_eq <= 1'b1;
-					end
-
-		//	OP_JMPC:	begin
-			5'h11:	begin
-					nxt_prog_ctr <= branch_addr;
-					jump_true	<= 1'b1;
-					jump_carry <= 1'b1;
-					end
-
-			default: 	;			//= NOP
-			endcase
+                // ADD
+                5'h01: begin
+                    add_op_true      <= 1'b1;
+                    write_to_regfile <= 1'b1;
+                end
+            
+                // SUB (add with operand2 complemented + carry)
+                5'h02: begin
+                    add_op_true       <= 1'b1;
+                    en_op2_complement <= 1'b1;
+                    carry_in          <= 1'b1;
+                    write_to_regfile  <= 1'b1;
+                end
+            
+                // AND
+                5'h03: begin
+                    and_op_true       <= 1'b1;
+                    lgcl_or_bitwse_T  <= 1'b1;
+                    write_to_regfile  <= 1'b1;
+                end
+            
+                // OR
+                5'h04: begin
+                    or_op_true        <= 1'b1;
+                    lgcl_or_bitwse_T  <= 1'b1;
+                    write_to_regfile  <= 1'b1;
+                end
+            
+                // NOT
+                5'h05: begin
+                    not_op_true       <= 1'b1;
+                    lgcl_or_bitwse_T  <= 1'b1;
+                    write_to_regfile  <= 1'b1;
+                end
+            
+                // Shift Left
+                5'h06: begin
+                    shift_left_true   <= 1'b1;
+                    write_to_regfile  <= 1'b1;
+                end
+            
+                // Jump
+                5'h07: begin
+                    nxt_prog_ctr       <= branch_addr;
+                    jump_true          <= 1'b1;
+                    unconditional_jump <= 1'b1;
+                end
+            
+                // Load
+                5'h08: begin
+                    load_true         <= 1'b1;
+                    write_to_regfile  <= 1'b1;
+                end
+            
+                // Store
+                5'h09: begin
+                    store_true        <= 1'b1;
+                end
+            
+                // Bitwise AND/OR/NOT
+                5'h0A: begin
+                    and_bitwise_true  <= 1'b1;
+                    lgcl_or_bitwse_T  <= 1'b1;
+                    write_to_regfile  <= 1'b1;
+                end
+            
+                5'h0B: begin
+                    or_bitwise_true   <= 1'b1;
+                    lgcl_or_bitwse_T  <= 1'b1;
+                    write_to_regfile  <= 1'b1;
+                end
+            
+                5'h0C: begin
+                    not_bitwise_true  <= 1'b1;
+                    lgcl_or_bitwse_T  <= 1'b1;
+                    write_to_regfile  <= 1'b1;
+                end
+            
+                // Compare (subtract, set flags only)
+                5'h0D: begin
+                    add_op_true       <= 1'b1;
+                    en_op2_complement <= 1'b1;
+                    carry_in          <= 1'b1;
+                    compare_true      <= 1'b1;
+                end
+            
+                // Conditional jumps
+                5'h0E: begin
+                    nxt_prog_ctr  <= branch_addr;
+                    jump_true     <= 1'b1;
+                    jump_gt       <= 1'b1;
+                end
+            
+                5'h0F: begin
+                    nxt_prog_ctr  <= branch_addr;
+                    jump_true     <= 1'b1;
+                    jump_lt       <= 1'b1;
+                end
+            
+                5'h10: begin
+                    nxt_prog_ctr  <= branch_addr;
+                    jump_true     <= 1'b1;
+                    jump_eq       <= 1'b1;
+                end
+            
+                5'h11: begin
+                    nxt_prog_ctr  <= branch_addr;
+                    jump_true     <= 1'b1;
+                    jump_carry    <= 1'b1;
+                end
+            
+                default: begin
+                    // NOP: all control signals remain zero
+                end
+            
+            endcase
 		end
 
 	
-//BYPASS logic
-//check store pipeline stage signals and address to determine
-// if one of the operands have to be bypassed
 
+
+//======================================================================
+// Decode-Stage Bypass (Forwarding) Logic
+// Detects RAW hazards where the instruction in Decode needs a register
+// being written by an instruction ahead in the pipeline.
+//
+// If the previous instruction writes a register and that register equals
+// either op1_addr or op2_addr, AND the instruction is not a LOAD
+// (load results are not yet available), then bypass the data.
+//
+// This selects between:
+//   - op?_rd_data       (normal regfile output)
+//   - datamem_wr_data   (forwarded/bypassed result)
+//
+//======================================================================
+
+//---------------------------
+// Operand 1 bypass detector
+//---------------------------
 always @(op1_addr or destination_reg_addr or reg_wr_en or load_true)
 
 	begin
@@ -288,6 +406,10 @@ always @(op1_addr or destination_reg_addr or reg_wr_en or load_true)
 		bypass_op1_dcd_stage <= 1'b0;
 	end
 
+
+//---------------------------
+// Operand 2 bypass detector
+//---------------------------
 always @(op2_addr or destination_reg_addr or reg_wr_en or load_true)
 
 	begin
@@ -297,6 +419,10 @@ always @(op2_addr or destination_reg_addr or reg_wr_en or load_true)
 		bypass_op2_dcd_stage <= 1'b0;
 	end
 
+    
+//---------------------------
+// Actual data selection
+//---------------------------
 assign op1_data = bypass_op1_dcd_stage  ? datamem_wr_data : op1_rd_data;
 assign op2_data = bypass_op2_dcd_stage  ? datamem_wr_data : op2_rd_data;
 
@@ -307,54 +433,54 @@ assign op2_data = bypass_op2_dcd_stage  ? datamem_wr_data : op2_rd_data;
 
 	always @(posedge clk)
 		begin
-		add_op_true_reg	<= #1	add_op_true;
-		or_op_true_reg	<= #1	or_op_true;
-		not_op_true_reg	<= #1	not_op_true;
-		and_bitwise_true_reg <= #1 and_bitwise_true; 
-		or_bitwise_true_reg <= #1 or_bitwise_true;
-		not_bitwise_true_reg <= #1 not_bitwise_true;  
-		and_op_true_reg	<= #1	and_op_true;
-		or_op_true_reg	<= #1	or_op_true;      
-		not_op_true_reg	<= #1	not_op_true;
-		carry_in_reg	<= #1  carry_in;
-		en_op2_complement_reg  <= #1 en_op2_complement;
-		nxt_prog_ctr_reg 	<= #1 nxt_prog_ctr;
-		jump_true_reg	<= #1 jump_true;
-		compare_true_reg <= #1 compare_true;
-		op1_data_reg	<= #1 op1_data ;
-		op2_data_reg	<= #1 op2_data ;
-		shift_left_true_reg <= #1 shift_left_true;
-		lgcl_or_bitwse_T_reg <= #1 lgcl_or_bitwse_T;
-		store_true_reg <= #1 store_true;
-		load_true_reg <= #1 load_true;
-		write_to_regfile_reg <= #1 write_to_regfile;
-		ld_mem_addr_reg <= #1 ld_mem_addr;
-		st_mem_addr_reg <= #1 st_mem_addr;
-		invalidate_fetch_instr_r1 <= #1 invalidate_fetch_instr;
-		jump_gt_reg <= #1 jump_gt;
-		jump_lt_reg <= #1 jump_lt;
-		jump_eq_reg <= #1 jump_eq;
-		jump_carry_reg <= #1 jump_carry;
-		unconditional_jump_reg <= #1 unconditional_jump;
+		    add_op_true_reg	<= #1	add_op_true;
+		    or_op_true_reg	<= #1	or_op_true;
+		    not_op_true_reg	<= #1	not_op_true;
+		    and_bitwise_true_reg <= #1 and_bitwise_true; 
+		    or_bitwise_true_reg <= #1 or_bitwise_true;
+		    not_bitwise_true_reg <= #1 not_bitwise_true;  
+		    and_op_true_reg	<= #1	and_op_true;
+		    or_op_true_reg	<= #1	or_op_true;      
+		    not_op_true_reg	<= #1	not_op_true;
+		    carry_in_reg	<= #1  carry_in;
+		    en_op2_complement_reg  <= #1 en_op2_complement;
+		    nxt_prog_ctr_reg 	<= #1 nxt_prog_ctr;
+		    jump_true_reg	<= #1 jump_true;
+		    compare_true_reg <= #1 compare_true;
+		    op1_data_reg	<= #1 op1_data ;
+		    op2_data_reg	<= #1 op2_data ;
+		    shift_left_true_reg <= #1 shift_left_true;
+		    lgcl_or_bitwse_T_reg <= #1 lgcl_or_bitwse_T;
+		    store_true_reg <= #1 store_true;
+		    load_true_reg <= #1 load_true;
+		    write_to_regfile_reg <= #1 write_to_regfile;
+		    ld_mem_addr_reg <= #1 ld_mem_addr;
+		    st_mem_addr_reg <= #1 st_mem_addr;
+		    invalidate_fetch_instr_r1 <= #1 invalidate_fetch_instr;
+		    jump_gt_reg <= #1 jump_gt;
+		    jump_lt_reg <= #1 jump_lt;
+		    jump_eq_reg <= #1 jump_eq;
+		    jump_carry_reg <= #1 jump_carry;
+		    unconditional_jump_reg <= #1 unconditional_jump;
 		end
 
 always @(posedge clk)
 	if (reset == 1'b1)
 		begin
-		op1_addr_reg <= 3'b000;
-		op2_addr_reg <= 3'b000;
-		res_addr_reg <= 3'b000;
-		invalidate_decode_instr <= 1'b0;
+		    op1_addr_reg <= 3'b000;
+		    op2_addr_reg <= 3'b000;
+		    res_addr_reg <= 3'b000;
+		    invalidate_decode_instr <= 1'b0;
 		end
 	else
 		begin 
-		op1_addr_reg <= #1 op1_addr;          
-		op2_addr_reg <= #1 op2_addr;
-		res_addr_reg <= #1 res_addr;                
-		if (branch_taken_reg == 1'b1)
-			invalidate_decode_instr <= #1 1'b1;
-		else
-			invalidate_decode_instr <= #1 1'b0;	
+		    op1_addr_reg <= #1 op1_addr;          
+		    op2_addr_reg <= #1 op2_addr;
+		    res_addr_reg <= #1 res_addr;                
+		    if (branch_taken_reg == 1'b1)
+		    	invalidate_decode_instr <= #1 1'b1;
+		    else
+		    	invalidate_decode_instr <= #1 1'b0;	
 		end	
 
 
@@ -364,97 +490,149 @@ always @(posedge clk)
 //EXECUTION UNIT LOGIC
 //*********************
 
-//BYPASS logic
-//check store pipeline stage signals and address to determine
-// if one of the operands have to be bypassed
-
+//======================================================================
+// EXECUTE-STAGE BYPASS LOGIC (Forwarding)
+//----------------------------------------------------------------------
+// Detects RAW hazards where the instruction in EX needs a register
+// being written by a later pipeline stage (MEM/WB).
+//
+// Matches source registers (op1/op2) against the destination register
+// of the previous instruction. If previous instruction writes a result
+// AND is not a LOAD (data not available), bypass the new value.
+//
+//======================================================================
 always @(op1_addr_reg or destination_reg_addr or reg_wr_en or op2_addr_reg or load_true_reg)
 
 	begin
-	if ((op1_addr_reg == destination_reg_addr) && (reg_wr_en == 1'b1) && (load_true_reg == 1'b0))
-		bypass_op1_ex_stage <= 1'b1;
-	else
-		bypass_op1_ex_stage <= 1'b0;
+        // -------------------
+        // OPERAND 1 BYPASS
+        // -------------------
+	    if ((op1_addr_reg == destination_reg_addr) && (reg_wr_en == 1'b1) && (load_true_reg == 1'b0))
+	    	bypass_op1_ex_stage <= 1'b1;
+	    else
+	    	bypass_op1_ex_stage <= 1'b0;
 
-	if ((op2_addr_reg == destination_reg_addr) && (reg_wr_en == 1'b1) && (load_true_reg == 1'b0))
-		bypass_op2_ex_stage <= 1'b1;
-	else
-		bypass_op2_ex_stage <= 1'b0;
+        // -------------------
+        // OPERAND 2 BYPASS
+        // -------------------
+	    if ((op2_addr_reg == destination_reg_addr) && (reg_wr_en == 1'b1) && (load_true_reg == 1'b0))
+	    	bypass_op2_ex_stage <= 1'b1;
+	    else
+	    	bypass_op2_ex_stage <= 1'b0;
 	end
 
 
-
+// -------------------
+// Select Operand Data
+// -------------------
 assign operand1 = bypass_op1_ex_stage  ? datamem_wr_data : op1_data_reg;
 assign operand2 = bypass_op2_ex_stage  ? datamem_wr_data : op2_data_reg;
 
   
-// add zero to operand 1 to pass data to store results stage
-// in STORE instructions
+//======================================================================
+// ALU INPUT PREPARATION
+//----------------------------------------------------------------------
+// - STORE instructions feed zero into operand2
+// - SUB/COMPARE invert operand2 and add carry-in
+// - Otherwise pass operand2 through as-is
+//======================================================================
 
 always @(operand1 or operand2 or en_op2_complement_reg or store_true_reg or add_op_true_reg or lgcl_or_bitwse_T_reg or shift_left_true_reg)
 
-		begin
-		data_in1 <= operand1;            
+	begin
+	    data_in1 <= operand1;      
 
-		if (store_true_reg == 1'b1)
-		   data_in2 <= 8'b0;
-		else if (en_op2_complement_reg == 1)
-		   data_in2 <= ~operand2;
-		else
-		   data_in2 <= operand2;
-		end
+	    if (store_true_reg == 1'b1)
+	       data_in2 <= 8'b0;
+	    else if (en_op2_complement_reg == 1)
+	       data_in2 <= ~operand2;
+	    else
+	       data_in2 <= operand2;
+	end
 
+//======================================================================
+// EXECUTION UNIT
+// Performs arithmetic, logic, shift operations, compare flag generation,
+// and branch condition evaluation.
+//======================================================================
 
-//Instruction execution
+//----------------------------------------------------------------------
+// ALU: ADD / SUB / STORE pass-through
+//----------------------------------------------------------------------
+// Two's complement subtraction is handled earlier by complementing
+// operand2 and asserting carry_in_reg = 1.
 
-//ALU and store instructionss
 always @(data_in1 or data_in2 or carry_in_reg)
-		{alu_carry_out, alu_data_out} <= data_in1 + data_in2
-							  + carry_in_reg;
+		{alu_carry_out, alu_data_out} <= data_in1 + data_in2 + carry_in_reg;
 
-// Compare instruction
+//----------------------------------------------------------------------
+// Compare instruction flag generation
+// Only valid if compare_true_reg == 1
+//----------------------------------------------------------------------
 
-assign gt_flag_ex = (alu_carry_out == 1'b1) && (alu_data_out != 8'b0) && (compare_true_reg == 1'b1);
+assign gt_flag_ex = ((compare_true_reg == 1'b1) &&
+                     (alu_carry_out == 1'b1) &&
+                     (alu_data_out != 8'b0));
 
-assign lt_flag_ex = (alu_carry_out == 1'b0) && (alu_data_out != 8'b0) && (compare_true_reg == 1'b1);
+assign lt_flag_ex = ((compare_true_reg == 1'b1) &&
+                     (alu_carry_out == 1'b0) &&
+                     (alu_data_out != 8'b0));
 
-assign eq_flag_ex = (alu_data_out == 8'b00) && (compare_true_reg == 1'b1);
+assign eq_flag_ex = ((compare_true_reg == 1'b1) &&
+                     (alu_data_out == 8'b00000000));
 
-//Shift Left
+//----------------------------------------------------------------------
+// Shift-left operation
+//----------------------------------------------------------------------
+
 always @(data_in1)
 	begin
-	shift_carry_out <= data_in1[7];
-	shift_data_out	<= {data_in1[6:0], 1'b0};
+	    shift_carry_out <= data_in1[7];             // bit shifted out
+	    shift_data_out	<= {data_in1[6:0], 1'b0};   // logical shift left
 	end 
 
-// Logical and bitwiseinstructions                        
+//----------------------------------------------------------------------
+// Logical / Bitwise operations
+//----------------------------------------------------------------------                    
 
 always @(and_op_true_reg or or_op_true_reg or not_op_true_reg or and_bitwise_true_reg or or_bitwise_true_reg or not_bitwise_true_reg or data_in1 or data_in2 )
+    begin
+        case (1'b1)
 
-	if (and_op_true_reg == 1'b1)
-		logical_data_out <= data_in1 && data_in2;
-	else if (or_op_true_reg == 1'b1)
-		logical_data_out <= data_in1 || data_in2;       
-	else if (not_op_true_reg == 1'b1)
-		logical_data_out <= ! data_in1;
-	else if (and_bitwise_true_reg == 1'b1)
-		logical_data_out <= data_in1 & data_in2;
-	else if (or_bitwise_true_reg == 1'b1)
-		logical_data_out <= data_in1 | data_in2;
-	else logical_data_out <= ! data_in1;   //defaault is NOT op
+            and_op_true_reg:        logical_data_out = data_in1 && data_in2;
+            or_op_true_reg:         logical_data_out = data_in1 || data_in2;
+            not_op_true_reg:        logical_data_out = !data_in1;
+
+            and_bitwise_true_reg:   logical_data_out = data_in1 & data_in2;
+            or_bitwise_true_reg:    logical_data_out = data_in1 | data_in2;
+            not_bitwise_true_reg:   logical_data_out = ~data_in1;
+
+            default:                logical_data_out = ~data_in1;  // fallback
+        endcase
+    end
 
 
-//merge results
-
+//----------------------------------------------------------------------
+// Result MUX
+// Select final data output for MEM stage
+//----------------------------------------------------------------------
 assign data_out = (add_op_true_reg || store_true_reg) ? alu_data_out :
- (lgcl_or_bitwse_T_reg ? logical_data_out : shift_data_out);
-                                                         
+                                                        (lgcl_or_bitwse_T_reg ? logical_data_out : shift_data_out);
+                 
+//----------------------------------------------------------------------
+// Carry-out selection
+//----------------------------------------------------------------------
 assign carry_out = add_op_true_reg ? alu_carry_out : shift_carry_out;
 
+//----------------------------------------------------------------------
+// Carry flag writes (skip during compare)
+//----------------------------------------------------------------------
 assign save_carry_flag = (add_op_true_reg && !compare_true_reg) || shift_left_true_reg;	
 
-// BRANCH LOGIC
-// add for conditional jumps
+//======================================================================
+// BRANCH CONDITION LOGIC
+// Combine EX-stage compare flags with stored flags
+//======================================================================
 
 assign gt_flag_true = 
 		(((compare_true_r2 && !invalidate_instr) == 1'b1) &&
@@ -470,35 +648,41 @@ assign carry_flag_true =
 		(((save_carry_flag_reg  && !invalidate_instr) == 1'b1)
 		&& carry_flag_ex) || carry_flag ;
 
-
-assign branch_taken = unconditional_jump_reg || (gt_flag_true && jump_gt_reg) ||
-		(lt_flag_true && jump_lt_reg) || (eq_flag_true && jump_eq_reg)  || (carry_flag_true && jump_carry_reg) ;
- 
+//----------------------------------------------------------------------
+// Final branch decision
+//----------------------------------------------------------------------
+assign branch_taken =
+       unconditional_jump_reg ||
+      (gt_flag_true    && jump_gt_reg)    ||
+      (lt_flag_true    && jump_lt_reg)    ||
+      (eq_flag_true    && jump_eq_reg)    ||
+      (carry_flag_true && jump_carry_reg);
 
                                               
 //****************************************
 // EXECUTION STAGE PIPELINE REGISTERS
-//****************************************              
+//****************************************
                                                         
 // Note that asynchronous read of memory ensures that no bypass
 // is needed for STORE followed by LOAD
 
 always @(posedge clk)
 	begin
-	if (save_carry_flag == 1'b1)
-		carry_flag_ex <= #1 carry_out;
-	operation_result <= #1 data_out;
-	data_wr_addr <= #1 store_true_reg ? st_mem_addr_reg : ld_mem_addr_reg; 
-	data_rd_addr <= #1 ld_mem_addr_reg; 
-	data_out_reg <= #1 data_out;
-	load_mem_data <= #1 load_true_reg;
-	invalidate_fetch_instr_r2 <= #1 invalidate_fetch_instr_r1;
-	invalidate_decode_instr_r1 <= #1 invalidate_decode_instr; 
-	gt_flag_ex_reg <= #1 gt_flag_ex;
-	lt_flag_ex_reg <= #1 lt_flag_ex;
-	eq_flag_ex_reg <= #1 eq_flag_ex;
-	compare_true_r2 <= #1 compare_true_reg;       
-	nxt_prog_ctr_r2 <= #1 nxt_prog_ctr_reg;
+	    if (save_carry_flag == 1'b1)
+	    	carry_flag_ex <= #1 carry_out;
+        
+        operation_result <= #1 data_out;
+	    data_wr_addr <= #1 store_true_reg ? st_mem_addr_reg : ld_mem_addr_reg; 
+	    data_rd_addr <= #1 ld_mem_addr_reg; 
+	    data_out_reg <= #1 data_out;
+	    load_mem_data <= #1 load_true_reg;
+	    invalidate_fetch_instr_r2 <= #1 invalidate_fetch_instr_r1;
+	    invalidate_decode_instr_r1 <= #1 invalidate_decode_instr; 
+	    gt_flag_ex_reg <= #1 gt_flag_ex;
+	    lt_flag_ex_reg <= #1 lt_flag_ex;
+	    eq_flag_ex_reg <= #1 eq_flag_ex;
+	    compare_true_r2 <= #1 compare_true_reg;       
+	    nxt_prog_ctr_r2 <= #1 nxt_prog_ctr_reg;
 	end
 // data_wr_addr[10:8] is also the result wr addr
 // and datamem wr data is also the wr data for register writes
@@ -506,26 +690,27 @@ always @(posedge clk)
 //Disable register and memory writes during reset
 always @(posedge clk)
 	if (reset == 1'b1)
-	   begin
-		store_to_mem_ex <= #1 1'b0;
-		reg_wr_en_ex <= #1 1'b0;
-		destination_reg_addr <= 3'b0;
-		branch_taken_reg <= 1'b0;
-		invalidate_execute_instr <= 1'b0;
-		save_carry_flag_reg <= 1'b0;
-	   end
+	    begin
+		    store_to_mem_ex <= #1 1'b0;
+		    reg_wr_en_ex <= #1 1'b0;
+		    destination_reg_addr <= 3'b0;
+		    branch_taken_reg <= 1'b0;
+		    invalidate_execute_instr <= 1'b0;
+		    save_carry_flag_reg <= 1'b0;
+	    end
 	else
-	   begin
-		store_to_mem_ex <= #1 store_true_reg;
-		reg_wr_en_ex <= #1 write_to_regfile_reg;
-		destination_reg_addr <= #1 res_addr_reg;
-		branch_taken_reg <= #1 branch_taken;
-		save_carry_flag_reg <= #1 save_carry_flag; 
-		if (branch_taken_reg == 1'b1)
-			invalidate_execute_instr <= #1 1'b1;
-		else
-			invalidate_execute_instr <= #1 1'b0;
-	   end
+	    begin
+		    store_to_mem_ex <= #1 store_true_reg;
+		    reg_wr_en_ex <= #1 write_to_regfile_reg;
+		    destination_reg_addr <= #1 res_addr_reg;
+		    branch_taken_reg <= #1 branch_taken;
+		    save_carry_flag_reg <= #1 save_carry_flag; 
+		    
+            if (branch_taken_reg == 1'b1)
+		    	invalidate_execute_instr <= #1 1'b1;
+		    else
+		    	invalidate_execute_instr <= #1 1'b0;
+	    end
 
 
 //****************************************
@@ -553,23 +738,23 @@ always @(posedge clk)
 	begin                                
 	if (reset == 1'b1)                     
 		begin
-		carry_flag <= 1'b0;
-		gt_flag <= 1'b0;
-		lt_flag <= 1'b0;
-		eq_flag <= 1'b0;
+		    carry_flag <= 1'b0;
+		    gt_flag <= 1'b0;
+		    lt_flag <= 1'b0;
+		    eq_flag <= 1'b0;
 		end
 		
 	else 
 		begin
-		if ((save_carry_flag_reg && !invalidate_instr) == 1'b1)
-	carry_flag <= #1 carry_flag_ex;
+		    if ((save_carry_flag_reg && !invalidate_instr) == 1'b1)
+	            carry_flag <= #1 carry_flag_ex;
 
-		if ((compare_true_r2 && !invalidate_instr) == 1'b1)
-			begin
-			gt_flag <= #1 gt_flag_ex_reg;
-			lt_flag <= #1 lt_flag_ex_reg;
-			eq_flag <= #1 eq_flag_ex_reg;
-			end
+		    if ((compare_true_r2 && !invalidate_instr) == 1'b1)
+		    	begin
+		    	    gt_flag <= #1 gt_flag_ex_reg;
+		    	    lt_flag <= #1 lt_flag_ex_reg;
+		    	    eq_flag <= #1 eq_flag_ex_reg;
+		    	end
 		end
 	end
 
