@@ -1,0 +1,28 @@
+
+//OPCODES PROPERTIES 
+
+valid_opcode: assume property (@(posedge clk) opcode inside {
+	OPC_NOP,
+	OPC_ADD,
+	OPC_SUB,
+	OPC_AND,
+	OPC_OR,
+	OPC_NOT,
+	OPC_SHIFT,
+	OPC_JMP,
+	OPC_LOAD,
+	OPC_STORE,
+	OPC_ANDBIT,
+	OPC_ORBIT,
+	OPC_NOTBIT,
+	OPC_COMPARE,
+	OPC_JMPGT,
+	OPC_JMPLT,
+	OPC_JMPEQ,
+	OPC_JMPC});
+
+//PROGRAM COUNTER PROPERTIES
+
+valid_pc : assume property (@(posedge clk) prog_ctr < 1024); //assuming valid program counter (< 1024)
+pc_inc : assert property (@(posedge clk) ) //
+

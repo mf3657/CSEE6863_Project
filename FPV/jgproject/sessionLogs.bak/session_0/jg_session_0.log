@@ -1,0 +1,193 @@
+# ----------------------------------------
+# Jasper Version Info
+# tool      : Jasper 2024.06
+# platform  : Linux 4.18.0-553.83.1.el8_10.x86_64
+# version   : 2024.06p002 64 bits
+# build date: 2024.09.02 16:28:38 UTC
+# ----------------------------------------
+# started   : 2025-11-22 18:52:24 EST
+# hostname  : micro11.(none)
+# pid       : 566123
+# arguments : '-label' 'session_0' '-console' '//127.0.0.1:37361' '-style' 'windows' '-data' 'AAAAkHicY2RgYLCp////PwMYMD6A0Aw2jAyoAMRnQhUJbEChGRhYYZphSkAaOBh0GdIYChjKgGwZBjeGAIYwhnggv4ghnyEZyCpj0GMoAbJywDoAwvkNpA==' '-proj' '/homes/user/stud/fall24/fga2116/FV/CSEE6863_Project/FPV/jgproject/sessionLogs/session_0' '-init' '-hidden' '/homes/user/stud/fall24/fga2116/FV/CSEE6863_Project/FPV/jgproject/.tmp/.initCmds.tcl' 'FPV_proc_v.tcl'
+
+Any disclosure about the Cadence Design Systems software or its use
+model to any third party violates the written Non-Disclosure Agreement
+between Cadence Design Systems, Inc. and the customer.
+
+THIS SOFTWARE CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF
+CADENCE DESIGN SYSTEMS, INC. USE, DISCLOSURE, OR REPRODUCTION IS
+PROHIBITED WITHOUT THE PRIOR EXPRESS WRITTEN PERMISSION OF CADENCE
+DESIGN SYSTEMS, INC.
+
+Copyright (C) 2000-2024 Cadence Design Systems, Inc. All Rights
+Reserved.  Unpublished -- rights reserved under the copyright laws of
+the United States.
+
+This product includes software developed by others and redistributed
+according to license agreement. See doc/third_party_readme.txt for
+further details.
+
+RESTRICTED RIGHTS LEGEND
+
+Use, duplication, or disclosure by the Government is subject to
+restrictions as set forth in subparagraph (c) (1) (ii) of the Rights in
+Technical Data and Computer Software clause at DFARS 252.227-7013 or
+subparagraphs (c) (1) and (2) of Commercial Computer Software -- Restricted
+Rights at 48 CFR 52.227-19, as applicable.
+
+
+                          Cadence Design Systems, Inc.
+                          2655 Seely Avenue
+                          San Jose, CA 95134
+                          Phone: 408.943.1234
+
+For technical assistance visit http://support.cadence.com.
+
+Jasper Apps Analysis Session - /homes/user/stud/fall24/fga2116/FV/CSEE6863_Project/FPV/jgproject/sessionLogs/session_0
+
+INFO: successfully checked out licenses "jasper_interactive" and "jasper_fao".
+INFO: reading configuration file "/user/stud/fall24/fga2116/.config/cadence/jasper.conf".
+% # ------------------------------------------
+% # CSEE6863 - Columbia University
+% # FIFO example FPV introduction
+% # Hardware group 1
+% # 	- Michael John Flynn: mf3657
+% # 	- Felipe Andrade: fga2116
+% # ------------------------------------------
+% 
+% # Analyze design under verifcation files
+% set ROOT_PATH ../design
+../design
+% 
+% analyze -sv \
+	${ROOT_PATH}/proc.v
+[-- (VERI-1482)] Analyzing Verilog file '/tools/cadence/jasper_2024.06p002/lib/verilog/packages/std/std.sv' into library 'std'
+[-- (VERI-1482)] Analyzing Verilog file '../design/proc.v'
+% 
+% # We will place assertions directly into our .sv
+% # But if using .sva files use the following
+% # analyze -sva \
+# 	${PROP_PATH}/generic.sva
+% 
+% elaborate -top processor_top
+INFO (ISW003): Top module name is "processor_top".
+[INFO (HIER-8002)] ../design/proc.v(41): Disabling old hierarchical reference handler
+[INFO (VERI-1018)] ../design/proc.v(44): compiling module 'instr_and_data_mem'
+[INFO (VERI-2571)] ../design/proc.v(61): extracting RAM for identifier 'instr_mem'
+[WARN (VERI-9033)] ../design/proc.v(61): array instr_mem (size 16384) automatically BLACK-BOXED. Use the "elaborate -bbox_a" command to prevent automatic black-boxing.
+[WARN (VERI-1060)] ../design/proc.v(83): 'initial' construct is ignored
+[WARN (VERI-1221)] ../design/proc.v(87): 'data_mem' should be on the sensitivity list
+[WARN (VDB-1002)] ../design/proc.v(61): net 'instr_mem' does not have a driver
+[INFO (VERI-1018)] ../design/proc.v(97): compiling module 'processor_core'
+[WARN (VERI-1209)] ../design/proc.v(651): expression size 8 truncated to fit in target size 3
+[WARN (VERI-1209)] ../design/proc.v(652): expression size 8 truncated to fit in target size 1
+[WARN (VDB-1000)] ../design/proc.v(205): net 'prog_ctr[9]' is constantly driven from multiple places
+[WARN (VDB-1001)] ../design/proc.v(726): found another driver here
+[INFO (VERI-1018)] ../design/proc.v(735): compiling module 'register_file'
+[WARN (VERI-1221)] ../design/proc.v(751): 'reg_file' should be on the sensitivity list
+[WARN (VERI-1221)] ../design/proc.v(752): 'reg_file' should be on the sensitivity list
+[INFO (VERI-1018)] ../design/proc.v(22): compiling module 'processor_top'
+INFO (INL208): Elaboration synthesis summary:
+  Number of synthesized netlists          4 (0 packages)
+  Single run mode                         On
+  Pipeline                                On (4 pipelined netlists)
+  Late hierarchical reference connection  On
+  Number of analyzed Verilog modules      5 (4 synthesized)
+  Number of analyzed VHDL entities        0 (0 synthesized)
+INFO (INL003): Clearing all state information (assumes, stopats, and so forth).
+INFO (IMDS005): Number of multiple-driven bits in design: 26. Use "get_design_info -list multiple_driven" for more information.
+processor_top
+[<embedded>] % 
+[<embedded>] % clock clk
+[<embedded>] % reset ~reset
+INFO (IPM031): Clearing proof results of all properties.
+INFO (IRS006): Current reset condition is "reset".
+[<embedded>] % 
+[<embedded>] % # Get design information to check general complexity
+[<embedded>] % get_design_info
+Statistics [for instance "processor_top"]
+---------------------------
+# Flops:         321 (2297) (0 property flop bits)
+# Latches:       4 (13)
+# Gates:         641 (7979)
+# Nets:          935
+# Ports:         2
+# RTL Lines:     734
+# RTL Instances: 4
+# Embedded Assumptions: 2
+# Embedded Assertions:  0
+# Embedded Covers:      0
+2310
+[<embedded>] % 
+[<embedded>] % # Prove properties
+[<embedded>] % prove -all
+Ncustom1: Custom engine code is hT3Ng7hPPfiYQOTDZ3qhYOwGAM51eA+J/FjkM5shLioAsqhgLR4Ft+O1BuKG6ilQ83B9tLXSl+CwjiTMAQA
+Bcustom2: Custom engine code is hT3Nm7hPr1Vp3Di1Ra2USNIGL4JypRnLKLAdF6JAyuavO2JfGCiY9OZJhcAcOUnLx5xwNdhILGrAWX9s+z2WDkKwNR7tAfClBEjRFVQeq6DU54boFgEA
+AMcustom3: Custom engine code is hT3Ng7hP/feYQOTDZ3qhYOwGAM51eA+J/FjkM5shLioAsqhgLR4Ft+O1BuKG6ilQ83B9tLXSmmqwm7g9AQA
+Mpcustom4: Custom engine code is hT3NZbhP9fmY2AbBQnsjfOxn6c+6e6yL+/e8fZFmaQrnlgEA
+
+==============================================================
+SUMMARY
+==============================================================
+           Properties Considered              : 0
+                 assertions                   : 0
+                  - proven                    : 0
+                  - bounded_proven (user)     : 0
+                  - bounded_proven (auto)     : 0
+                  - marked_proven             : 0
+                  - cex                       : 0
+                  - ar_cex                    : 0
+                  - undetermined              : 0
+                  - unknown                   : 0
+                  - error                     : 0
+                 covers                       : 0
+                  - unreachable               : 0
+                  - bounded_unreachable (user): 0
+                  - covered                   : 0
+                  - ar_covered                : 0
+                  - undetermined              : 0
+                  - unknown                   : 0
+                  - error                     : 0
+no_properties
+[<embedded>] % #autoprove -time_limit 1h
+[<embedded>] % 
+[<embedded>] % # Report proof results
+[<embedded>] % report
+
+==============================================================
+    Jasper Verification Results
+==============================================================
+    2024.06p002 64 bits for Linux64 3.10.0-1160.21.1.el7.x86_64
+    Host Name: micro11.ee.columbia.edu
+    User Name: fga2116
+    Printed on: Saturday, Nov22, 2025 06:52:26 PM EST
+    Working Directory: /homes/user/stud/fall24/fga2116/FV/CSEE6863_Project/FPV
+
+
+==============================================================
+RESULTS
+==============================================================
+
+---------------------------------------------------------------------------------------------
+       Name                                 |    Result    |  Engine  |  Bound  |  Time    
+---------------------------------------------------------------------------------------------
+
+---[ <embedded> ]----------------------------------------------------------------------------
+
+==============================================================
+ASSUMPTIONS
+==============================================================
+
+-------------------------------------------------------------------------------
+       Name    |  Expression  |  Location     |  Status      |  Dependencies                  
+-------------------------------------------------------------------------------
+[1]   <embedded>::processor_top.proc1.valid_opcode  proc1.valid_opcode  N/A temporary         
+[2]   <embedded>::processor_top.proc1.valid_pc  proc1.valid_pc  N/A temporary                 
+[<embedded>] % 
+INFO (IPL005): Received request to exit from the console.
+INFO (IPL014): Waiting for the Tcl-thread to exit.
+INFO: Waiting for proof threads to stop...
+INFO: Proof threads stopped.
+INFO (IPL018): The peak resident set memory use for this session was 0.447 GB.
+INFO (IPL015): The Tcl-thread exited with status 0.
+INFO (IPL016): Exiting the analysis session with status 0.

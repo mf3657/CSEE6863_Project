@@ -1,3 +1,5 @@
+`define FORMAL
+
 module testbench;
 reg clk, reset;
 
@@ -7,6 +9,8 @@ initial
 	reset = 1'b1;
 	reset = #161 1'b0;
 	end
+
+
 
 always clk = #5 ~clk;
 
@@ -28,7 +32,6 @@ module processor_top (clk, reset);
  	wire [7:0]  datamem_rd_data, datamem_wr_data;
 	wire [7:0]  operation_result; 
 
- 
 	instr_and_data_mem  mem1(clk, prog_ctr, instr_mem_out, data_rd_addr, data_wr_addr, datamem_rd_data, datamem_wr_data, store_to_mem);
 
 	processor_core proc1(clk,reset,op1_rd_data,op2_rd_data, instr_mem_out,op1_addr, op2_addr,prog_ctr, store_to_mem, reg_wr_en, data_rd_addr, data_wr_addr, datamem_rd_data, datamem_wr_data, operation_result, destination_reg_addr );
@@ -59,10 +62,11 @@ module instr_and_data_mem (clk, prog_ctr, instr_mem_out, data_rd_addr, data_wr_a
 
 	
 // load program into memory 
-	initial
-	begin
-	$readmemh("../tb/program1.txt",instr_mem);
-	end
+	`ifndef FORMAL
+		initial begin
+			$readmemh("../tb/program1.txt",instr_mem);
+		end
+	`endif
 
 // read instructions from memory
 	always @(posedge clk)
@@ -166,6 +170,26 @@ module processor_core (clk,reset,op1_rd_data,op2_rd_data, instr_mem_out,op1_addr
 	wire		gt_flag_true, lt_flag_true, eq_flag_true;
 	wire		carry_flag_true;
 
+	//FV
+	localparam [4:0] OPC_NOP      = 5'h00;
+	localparam [4:0] OPC_ADD      = 5'h01;
+	localparam [4:0] OPC_SUB      = 5'h02;
+	localparam [4:0] OPC_AND      = 5'h03;
+	localparam [4:0] OPC_OR       = 5'h04;
+	localparam [4:0] OPC_NOT      = 5'h05;
+	localparam [4:0] OPC_SHIFT    = 5'h06;
+	localparam [4:0] OPC_JMP      = 5'h07;
+	localparam [4:0] OPC_LOAD     = 5'h08;
+	localparam [4:0] OPC_STORE    = 5'h09;
+	localparam [4:0] OPC_ANDBIT   = 5'h0a;
+	localparam [4:0] OPC_ORBIT    = 5'h0b;
+	localparam [4:0] OPC_NOTBIT   = 5'h0c;
+	localparam [4:0] OPC_COMPARE  = 5'h0d;
+	localparam [4:0] OPC_JMPGT    = 5'h0e;
+	localparam [4:0] OPC_JMPLT    = 5'h0f;
+	localparam [4:0] OPC_JMPEQ    = 5'h10;
+	localparam [4:0] OPC_JMPC     = 5'h11;
+	//FV
 
 //****************************************
 //   RESET INITIALUZATION
@@ -206,14 +230,37 @@ module processor_core (clk,reset,op1_rd_data,op2_rd_data, instr_mem_out,op1_addr
 //****************************
 	always@(instruction)
 		begin
-		opcode	<=  instruction[15:11];
-		op1_addr	<=  instruction[2:0];
+		opcode		<= instruction[15:11];
+		op1_addr	<= instruction[2:0];
 		op2_addr	<= instruction[6:4];
 		res_addr	<= instruction[10:8];
 		ld_mem_addr <= instruction[7:0];
 		st_mem_addr <= instruction [10:3];
 		branch_addr <= instruction[9:0];
 		end
+
+	//FV
+	valid_opcode: assume property (@(posedge clk) opcode inside {
+		OPC_NOP,
+		OPC_ADD,
+		OPC_SUB,
+		OPC_AND,
+		OPC_OR,
+		OPC_NOT,
+		OPC_SHIFT,
+		OPC_JMP,
+		OPC_LOAD,
+		OPC_STORE,
+		OPC_ANDBIT,
+		OPC_ORBIT,
+		OPC_NOTBIT,
+		OPC_COMPARE,
+		OPC_JMPGT,
+		OPC_JMPLT,
+		OPC_JMPEQ,
+		OPC_JMPC});
+	//FV
+
 
 	always@ (opcode or branch_addr)        
 		begin
@@ -676,8 +723,10 @@ always @(posedge clk)
 			prog_ctr <= #1 prog_ctr + 1'b1;
 			set_invalidate_instruction <= #1 1'b0;
 			end
-
 	   end
+
+	   valid_pc : assume property (@(posedge clk) prog_ctr < 1024);
+
 
 endmodule
 
