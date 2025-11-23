@@ -13,17 +13,61 @@ processor_top
 ```
 
 ## Instruction Decoding
+```bash
+ALU_OPERATIONS (ADD, SUB, AND, OR, ...)
+15         11 10      8 7    6 5     4 3    2 1       0
++------------+---------+------+-------+------+--------+
+|   opcode   | res_reg | XXX  | op2_r | XXX  | op1_r  |
++------------+---------+------+-------+------+--------+
+opcode → ALU operation
+res_reg → destination register
+op2_r → second operand register
+op1_r → first operand register
+X = unused/don’t care
 
+
+LOAD_INSTRUCTION
+15         11 10      8 7                                  0
++------------+---------+-----------------------------------+
+|   opcode   | res_reg |         immediate addr            |
++------------+---------+-----------------------------------+
+load from instruction[7:0] into register instruction[10:8]
+
+
+STORE_INSTRUCTION
+15         11 10                                  3 2       0
++------------+-------------------------------------+--------+
+|   opcode   |       store memory address          | op1_r  |
++------------+-------------------------------------+--------+
+store register op1_r -> memory address [10:3]
+no destination register
+
+
+BRANCH_INSTRUCTION
+15         11 10                                       0
++------------+-----------------------------------------+
+|   opcode   |              branch target              |
++------------+-----------------------------------------+
+branch_addr is 10 bits -> 1024-entry address space
+
+```
 ```verilog
 	always@(instruction)
 		begin
-		  opcode	<=  instruction[15:11];
-		  op1_addr	<=  instruction[2:0];
-		  op2_addr	<= instruction[6:4];
-		  res_addr	<= instruction[10:8];
-		  ld_mem_addr <= instruction[7:0];
-		  st_mem_addr <= instruction[10:3];
-		  branch_addr <= instruction[9:0];
+		    // ------------ Opcode ------------
+            opcode       <= instruction[15:11];
+
+            // ------------ Register fields ------------
+            op1_addr     <= instruction[2:0];
+            op2_addr     <= instruction[6:4];
+            res_addr     <= instruction[10:8];
+
+            // ------------ Memory Addresses ------------
+            ld_mem_addr  <= instruction[7:0];     // LOAD only
+            st_mem_addr  <= instruction[10:3];    // STORE only
+
+            // ------------ Branch Target ------------
+            branch_addr  <= instruction[9:0];
 		end
 ```
 

@@ -1,7 +1,26 @@
-# <span style="color: seagreen;">Processor Breakdown</span>
+# CSEE 6863 HARDWARE VERIFICATION PROJECT
+
+8 bit RISC Processor Verification Project
+Hardware group #1
+	- Michael John Flynn: mf3657
+	- Felipe Andrade: fga2116
+
+The goal of this project is to verify the functionality, and shortcomings, of an open source 8-bit microprocessor created by NayanaBannur, aswell as refactor and clean up the verilog.
+
+Original Repo can be found [here!](https://github.com/NayanaBannur/8-bit-RISC-Processor)
+
+## Methodology
+
+The 8 bit microprocessor includes a RISC architecture with 5 pipeline stages and a basic instruction set including 18 instructions, with an 8x8-bit register file. The 5 pipeline stages include instruction fetch, instruction decode, execution, memory access, and store results.
+
+To undertake this project we will utilise Cadence JasperGold verify the funcitonality of the core using various asserts and properties.
+
+---
+
+## <span style="color: seagreen;">Processor Breakdown</span>
 
 
-## Module Breakdown
+### Module Breakdown
 
 ```bash
 processor_top
@@ -12,22 +31,66 @@ processor_top
     |-processor_core # The whole damn thing
 ```
 
-## Instruction Decoding
+### Instruction Decoding
+```bash
+ALU_OPERATIONS (ADD, SUB, AND, OR, ...)
+15         11 10      8 7    6 5     4 3    2 1       0
++------------+---------+------+-------+------+--------+
+|   opcode   | res_reg | XXX  | op2_r | XXX  | op1_r  |
++------------+---------+------+-------+------+--------+
+opcode → ALU operation
+res_reg → destination register
+op2_r → second operand register
+op1_r → first operand register
+X = unused/don’t care
 
+
+LOAD_INSTRUCTION
+15         11 10      8 7                                  0
++------------+---------+-----------------------------------+
+|   opcode   | res_reg |         immediate addr            |
++------------+---------+-----------------------------------+
+load from instruction[7:0] into register instruction[10:8]
+
+
+STORE_INSTRUCTION
+15         11 10                                  3 2       0
++------------+-------------------------------------+--------+
+|   opcode   |       store memory address          | op1_r  |
++------------+-------------------------------------+--------+
+store register op1_r -> memory address [10:3]
+no destination register
+
+
+BRANCH_INSTRUCTION
+15         11 10                                       0
++------------+-----------------------------------------+
+|   opcode   |              branch target              |
++------------+-----------------------------------------+
+branch_addr is 10 bits -> 1024-entry address space
+
+```
 ```verilog
 	always@(instruction)
 		begin
-		  opcode	<=  instruction[15:11];
-		  op1_addr	<=  instruction[2:0];
-		  op2_addr	<= instruction[6:4];
-		  res_addr	<= instruction[10:8];
-		  ld_mem_addr <= instruction[7:0];
-		  st_mem_addr <= instruction[10:3];
-		  branch_addr <= instruction[9:0];
+		    // ------------ Opcode ------------
+            opcode       <= instruction[15:11];
+
+            // ------------ Register fields ------------
+            op1_addr     <= instruction[2:0];
+            op2_addr     <= instruction[6:4];
+            res_addr     <= instruction[10:8];
+
+            // ------------ Memory Addresses ------------
+            ld_mem_addr  <= instruction[7:0];     // LOAD only
+            st_mem_addr  <= instruction[10:3];    // STORE only
+
+            // ------------ Branch Target ------------
+            branch_addr  <= instruction[9:0];
 		end
 ```
 
-## Using memory data
+### Using memory data
 
 - passed from instr_and_data_mem as *datamem_rd_data* and assigned to *datamem_wr_data* when *load_mem_data* is high.
 - *datamem_wr_data* is used as follows when certain bypasses are enabled:
@@ -42,8 +105,8 @@ assign operand2 = bypass_op2_ex_stage  ? datamem_wr_data : op2_data_reg;
 ```
 - datamem_wr_data is also used to store values in the memory in the instr_and_data_mem module at the data_wr_addr index.
 
-## processor_core signals
-### Inputs
+### processor_core signals
+#### Inputs
 
 - **clk, rest:**
   - self explanatory
@@ -56,7 +119,7 @@ assign operand2 = bypass_op2_ex_stage  ? datamem_wr_data : op2_data_reg;
 - **<span style="color: green;">[15:0]</span> instr_mem_out:**
   - what?
 
-### Outputs
+#### Outputs
 
 - **<span style="color: green;">[2:0]</span> op1_addr, op2_addr:**
   - assigned as rd_addr1/2 within the register_file 8 bit memory module.
@@ -137,4 +200,3 @@ assign operand2 = bypass_op2_ex_stage  ? datamem_wr_data : op2_data_reg;
     // where
     case (opcode)
     /* many many opcodes set */ write_to_regfile /* which is, by default, */ 1'b0
-    ```
