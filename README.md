@@ -2,6 +2,7 @@
 
 8 bit RISC Processor Verification Project
 Hardware group #1
+
 	- Michael John Flynn: mf3657
 	- Felipe Andrade: fga2116
 
