@@ -781,4 +781,83 @@ always @(posedge clk)
 
 	   end
 
+
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+//
+// ASSERTIONS FOR PROCESSOR CORE
+//	- a_* = assert
+//	- c_* = cover
+//	- s_* = assume
+//
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+//-----------------------------------------------
+// DECODE LOGIC ASSERTIONS
+//-----------------------------------------------
+a_branch_addr_range: assert property (@(posedge clk)
+    opcode == OPCODE_BRANCH |-> branch_addr < 1024
+);
+
+a_load_addr_range: assert property (@(posedge clk)
+    opcode == OPCODE_LOAD |-> ld_mem_addr inside {[0:255]}
+);
+
+a_store_addr_range: assert property (@(posedge clk)
+    opcode == OPCODE_STORE |-> st_mem_addr inside {[0:255]}
+);
+
+
+//-----------------------------------------------
+// OPCODE ASSERTIONS
+//-----------------------------------------------
+
+localparam [4:0] OPC_NOP      = 5'h00;
+localparam [4:0] OPC_ADD      = 5'h01;
+localparam [4:0] OPC_SUB      = 5'h02;
+localparam [4:0] OPC_AND      = 5'h03;
+localparam [4:0] OPC_OR       = 5'h04;
+localparam [4:0] OPC_NOT      = 5'h05;
+localparam [4:0] OPC_SHIFT    = 5'h06;
+localparam [4:0] OPC_JMP      = 5'h07;
+localparam [4:0] OPC_LOAD     = 5'h08;
+localparam [4:0] OPC_STORE    = 5'h09;
+localparam [4:0] OPC_ANDBIT   = 5'h0a;
+localparam [4:0] OPC_ORBIT    = 5'h0b;
+localparam [4:0] OPC_NOTBIT   = 5'h0c;
+localparam [4:0] OPC_COMPARE  = 5'h0d;
+localparam [4:0] OPC_JMPGT    = 5'h0e;
+localparam [4:0] OPC_JMPLT    = 5'h0f;
+localparam [4:0] OPC_JMPEQ    = 5'h10;
+localparam [4:0] OPC_JMPC     = 5'h11;
+
+// Ensure with assume assert that opcode follows the RISC protocol
+s_valid_opcode: assume property ( @(posedge clk) 
+								opcode inside {
+									OPC_NOP,
+									OPC_ADD,
+									OPC_SUB,
+									OPC_AND,
+									OPC_OR,
+									OPC_NOT,
+									OPC_SHIFT,
+									OPC_JMP,
+									OPC_LOAD,
+									OPC_STORE,
+									OPC_ANDBIT,
+									OPC_ORBIT,
+									OPC_NOTBIT,
+									OPC_COMPARE,
+									OPC_JMPGT,
+									OPC_JMPLT,
+									OPC_JMPEQ,
+									OPC_JMPC
+								} );
+
+//-----------------------------------------------
+// PROGRAM COUNTER ASSERTIONS
+//-----------------------------------------------
+s_valid_pc : assume property (@(posedge clk) prog_ctr < 1024);
+
+
+
 endmodule
