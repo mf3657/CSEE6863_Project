@@ -784,7 +784,7 @@ always @(posedge clk)
 
 //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 //
-// ASSERTIONS FOR PROCESSOR CORE
+// ASSERTIONS FOR PROCESSOR_CORE
 //	- a_* = assert
 //	- c_* = cover
 //	- s_* = assume
