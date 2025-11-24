@@ -219,144 +219,141 @@ hardwired control-path microarchitecture.
 */
 
 	always@ (opcode or branch_addr)        
-begin
-		add_op_true <= 1'b0;
-		and_op_true <= 1'b0;
-		or_op_true  <= 1'b0;
-		not_op_true <= 1'b0; 
-		carry_in	<= 1'b0;
-		en_op2_complement  <= 1'b0;
-		jump_true	<= 1'b0;
-		compare_true <= 1'b0;
-		shift_left_true <= 1'b0;
-		lgcl_or_bitwse_T <= 1'b0;
-		load_true <= 1'b0;
-		store_true <= 1'b0;
-		write_to_regfile <= 1'b0;
-		unconditional_jump <= 1'b0;
-		jump_gt <= 1'b0;
-		jump_lt <= 1'b0;
-		jump_eq <= 1'b0;
-		jump_carry <= 1'b0;
+		begin
+			add_op_true <= 1'b0;
+			and_op_true <= 1'b0;
+			or_op_true  <= 1'b0;
+			not_op_true <= 1'b0; 
+			carry_in	<= 1'b0;
+			en_op2_complement  <= 1'b0;
+			jump_true	<= 1'b0;
+			compare_true <= 1'b0;
+			shift_left_true <= 1'b0;
+			lgcl_or_bitwse_T <= 1'b0;
+			load_true <= 1'b0;
+			store_true <= 1'b0;
+			write_to_regfile <= 1'b0;
+			unconditional_jump <= 1'b0;
+			jump_gt <= 1'b0;
+			jump_lt <= 1'b0;
+			jump_eq <= 1'b0;
+			jump_carry <= 1'b0;
 
 		case (opcode)
-		//	OP_NOP:  
-		//	5'h00:   	;		
-		
-		//	OP_ADD:	begin
-			5'h01:	begin
-					write_to_regfile <= 1'b1;
-					add_op_true <= 1'b1;
-					end
-	
-		//	OP_SUB:	begin
-			5'h02:	begin
-					add_op_true <= 1'b1;	
-					carry_in	<= 1'b1;
-					en_op2_complement <= 1'b1;
-					write_to_regfile <= 1'b1;
-				   	end
-
-		//	OP_AND:	begin
-			5'h03:	begin
-					and_op_true <= 1'b1;
-					lgcl_or_bitwse_T <= 1'b1;
-					write_to_regfile <= 1'b1;     
-					end
-
-		//	OP_OR:	begin
-			5'h04:	begin
-					or_op_true <= 1'b1;
-					lgcl_or_bitwse_T <= 1'b1;
-					write_to_regfile <= 1'b1;
-					end
-
-		//	OP_NOT:	begin
-			5'h05:	begin
-					not_op_true <= 1'b1;
-					lgcl_or_bitwse_T <= 1'b1;
-					write_to_regfile <= 1'b1;
-					end
-
-		//	OP_SHL	begin                  
-			5'h06:	begin
-					shift_left_true <= 1'b1;
-					write_to_regfile <= 1'b1;
-					end
-
-		//	OP_JMP:	begin
-			5'h07:	begin
-					nxt_prog_ctr <= branch_addr;
-					jump_true	<= 1'b1;
-					unconditional_jump <= 1'b1;
-					end
-
-		//	OP_LOAD:	begin
-			5'h08:	begin
-					load_true <= 1'b1;
-					write_to_regfile <= 1'b1;
-					end                      
-                                                      
-		//	OP_STORE:	store_true <= 1'b1;
-			5'h09:	store_true <= 1'b1;
-
-		//	OP_ANDBIT:	begin
-			5'h0a:	begin
-					and_bitwise_true <= 1'b1;
-					lgcl_or_bitwse_T <= 1'b1;
-					write_to_regfile <= 1'b1; 
-			   		end
-
-		//	OP_ORBIT:	begin
-			5'h0b:	begin
-					or_bitwise_true <= 1'b1;
-					lgcl_or_bitwse_T <= 1'b1;
-					write_to_regfile <= 1'b1;
-					end
-
-		//	OP_NOTBIT:	begin
-			5'h0c:	begin
-					not_bitwise_true <= 1'b1;
-					lgcl_or_bitwse_T <= 1'b1;
-					write_to_regfile <= 1'b1;
-					end
- 
-		//	OP_COMPARE: begin
-			5'h0d:	begin
-					add_op_true <= 1'b1;
-					compare_true <= 1'b1;	
-					carry_in	<= 1'b1;   //subtract
-					en_op2_complement <= 1'b1;
-				   	end
-
-		//	OP_JMPGT:	begin
-			5'h0e:	begin
-					nxt_prog_ctr <= branch_addr;
-					jump_true	<= 1'b1;
-					jump_gt <= 1'b1;
-					end
-
-		//	OP_JMPLT:	begin
-			5'h0f:	begin
-					nxt_prog_ctr <= branch_addr;
-					jump_true	<= 1'b1;
-					jump_lt <= 1'b1;
-					end
-		//	OP_JMPEQ:	begin
-			5'h10:	begin
-					nxt_prog_ctr <= branch_addr;
-					jump_true	<= 1'b1;
-					jump_eq <= 1'b1;
-					end
-
-		//	OP_JMPC:	begin
-			5'h11:	begin
-					nxt_prog_ctr <= branch_addr;
-					jump_true	<= 1'b1;
-					jump_carry <= 1'b1;
-					end
-
-			default: 	;			//= NOP
+			//	OP_ADD:	begin
+				5'h01:	begin
+						write_to_regfile <= 1'b1;
+						add_op_true <= 1'b1;
+						end
+					
+			//	OP_SUB:	begin
+				5'h02:	begin
+						add_op_true <= 1'b1;	
+						carry_in	<= 1'b1;
+						en_op2_complement <= 1'b1;
+						write_to_regfile <= 1'b1;
+					   	end
+					
+			//	OP_AND:	begin
+				5'h03:	begin
+						and_op_true <= 1'b1;
+						lgcl_or_bitwse_T <= 1'b1;
+						write_to_regfile <= 1'b1;     
+						end
+					
+			//	OP_OR:	begin
+				5'h04:	begin
+						or_op_true <= 1'b1;
+						lgcl_or_bitwse_T <= 1'b1;
+						write_to_regfile <= 1'b1;
+						end
+					
+			//	OP_NOT:	begin
+				5'h05:	begin
+						not_op_true <= 1'b1;
+						lgcl_or_bitwse_T <= 1'b1;
+						write_to_regfile <= 1'b1;
+						end
+					
+			//	OP_SHL	begin                  
+				5'h06:	begin
+						shift_left_true <= 1'b1;
+						write_to_regfile <= 1'b1;
+						end
+					
+			//	OP_JMP:	begin
+				5'h07:	begin
+						nxt_prog_ctr <= branch_addr;
+						jump_true	<= 1'b1;
+						unconditional_jump <= 1'b1;
+						end
+					
+			//	OP_LOAD:	begin
+				5'h08:	begin
+						load_true <= 1'b1;
+						write_to_regfile <= 1'b1;
+						end                      
+					
+			//	OP_STORE:	store_true <= 1'b1;
+				5'h09:	store_true <= 1'b1;
+					
+			//	OP_ANDBIT:	begin
+				5'h0a:	begin
+						and_bitwise_true <= 1'b1;
+						lgcl_or_bitwse_T <= 1'b1;
+						write_to_regfile <= 1'b1; 
+				   		end
+					
+			//	OP_ORBIT:	begin
+				5'h0b:	begin
+						or_bitwise_true <= 1'b1;
+						lgcl_or_bitwse_T <= 1'b1;
+						write_to_regfile <= 1'b1;
+						end
+					
+			//	OP_NOTBIT:	begin
+				5'h0c:	begin
+						not_bitwise_true <= 1'b1;
+						lgcl_or_bitwse_T <= 1'b1;
+						write_to_regfile <= 1'b1;
+						end
+					
+			//	OP_COMPARE: begin
+				5'h0d:	begin
+						add_op_true <= 1'b1;
+						compare_true <= 1'b1;	
+						carry_in	<= 1'b1;   //subtract
+						en_op2_complement <= 1'b1;
+					   	end
+					
+			//	OP_JMPGT:	begin
+				5'h0e:	begin
+						nxt_prog_ctr <= branch_addr;
+						jump_true	<= 1'b1;
+						jump_gt <= 1'b1;
+						end
+					
+			//	OP_JMPLT:	begin
+				5'h0f:	begin
+						nxt_prog_ctr <= branch_addr;
+						jump_true	<= 1'b1;
+						jump_lt <= 1'b1;
+						end
+			//	OP_JMPEQ:	begin
+				5'h10:	begin
+						nxt_prog_ctr <= branch_addr;
+						jump_true	<= 1'b1;
+						jump_eq <= 1'b1;
+						end
+					
+			//	OP_JMPC:	begin
+				5'h11:	begin
+						nxt_prog_ctr <= branch_addr;
+						jump_true	<= 1'b1;
+						jump_carry <= 1'b1;
+						end
+			//= NOP
+				default: 	;
 			endcase
 		end
 	
