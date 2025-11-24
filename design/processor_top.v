@@ -35,7 +35,7 @@ module processor_top (clk, reset);
 							);
 
 	register_file       regfile1(
-							clk, reset, 
+							.clk(clk), .reset(reset), 
 							.wr_data(datamem_wr_data), 
 							.rd_data1(op1_rd_data), .rd_data2(op2_rd_data), 
 							.rd_addr1(op1_addr), .rd_addr2(op2_addr), 

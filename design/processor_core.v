@@ -219,163 +219,146 @@ hardwired control-path microarchitecture.
 */
 
 	always@ (opcode or branch_addr)        
-		begin
+begin
+		add_op_true <= 1'b0;
+		and_op_true <= 1'b0;
+		or_op_true  <= 1'b0;
+		not_op_true <= 1'b0; 
+		carry_in	<= 1'b0;
+		en_op2_complement  <= 1'b0;
+		jump_true	<= 1'b0;
+		compare_true <= 1'b0;
+		shift_left_true <= 1'b0;
+		lgcl_or_bitwse_T <= 1'b0;
+		load_true <= 1'b0;
+		store_true <= 1'b0;
+		write_to_regfile <= 1'b0;
+		unconditional_jump <= 1'b0;
+		jump_gt <= 1'b0;
+		jump_lt <= 1'b0;
+		jump_eq <= 1'b0;
+		jump_carry <= 1'b0;
 
-            // ALU CONTROL SIGNALS
-            add_op_true         <= 1'b0; // enable ALU add/subtract unit
-            and_op_true         <= 1'b0; // enable AND operation
-            or_op_true          <= 1'b0; // enable OR operation
-            not_op_true         <= 1'b0; // enable NOT operation
-            shift_left_true     <= 1'b0; // perform logical shift left
+		case (opcode)
+		//	OP_NOP:  
+		//	5'h00:   	;		
+		
+		//	OP_ADD:	begin
+			5'h01:	begin
+					write_to_regfile <= 1'b1;
+					add_op_true <= 1'b1;
+					end
+	
+		//	OP_SUB:	begin
+			5'h02:	begin
+					add_op_true <= 1'b1;	
+					carry_in	<= 1'b1;
+					en_op2_complement <= 1'b1;
+					write_to_regfile <= 1'b1;
+				   	end
 
-            // bitwise versions of logical signals above
-            add_bitwise_true    <= 1'b0;
-            and_bitwise_true    <= 1'b0;
-            or_bitwise_true     <= 1'b0;
-            not_bitwise_true    <= 1'b0;
+		//	OP_AND:	begin
+			5'h03:	begin
+					and_op_true <= 1'b1;
+					lgcl_or_bitwse_T <= 1'b1;
+					write_to_regfile <= 1'b1;     
+					end
 
-            lgcl_or_bitwse_T    <= 1'b0; // select logical v.s bitwise ALU mode
-            en_op2_complement   <= 1'b0; // inverted operand 2 (for SUB an COMPARE)
-            carry_in            <= 1'b0; // Used for subtracting (SUB)
+		//	OP_OR:	begin
+			5'h04:	begin
+					or_op_true <= 1'b1;
+					lgcl_or_bitwse_T <= 1'b1;
+					write_to_regfile <= 1'b1;
+					end
 
-            // MEMORY / REGFILE CONTROL SIGNALS
-            load_true           <= 1'b0; // LOAD instr
-            store_true          <= 1'b0; // STORE instr
-            write_to_regfile    <= 1'b0; // write ALU or LOAD result to reg file
+		//	OP_NOT:	begin
+			5'h05:	begin
+					not_op_true <= 1'b1;
+					lgcl_or_bitwse_T <= 1'b1;
+					write_to_regfile <= 1'b1;
+					end
 
-            // BRANCH / JUMP CONTROL SIGNALS
-            jump_true           <= 1'b0; // Program counter should be updates
-            unconditional_jump  <= 1'b0; // used for JMP
-            jump_gt             <= 1'b0; // conditional greater than
-            jump_lt             <= 1'b0; // conditional less than
-            jump_eq             <= 1'b0; // conditional equal to
-            jump_carry          <= 1'b0; // conditional carry
+		//	OP_SHL	begin                  
+			5'h06:	begin
+					shift_left_true <= 1'b1;
+					write_to_regfile <= 1'b1;
+					end
 
-            nxt_prog_ctr        <= 10'b0; // Program counter branch target
+		//	OP_JMP:	begin
+			5'h07:	begin
+					nxt_prog_ctr <= branch_addr;
+					jump_true	<= 1'b1;
+					unconditional_jump <= 1'b1;
+					end
 
-            //--------------------------------------------------------
-            // Opcode decoding
-            //--------------------------------------------------------
-            case (opcode)
+		//	OP_LOAD:	begin
+			5'h08:	begin
+					load_true <= 1'b1;
+					write_to_regfile <= 1'b1;
+					end                      
+                                                      
+		//	OP_STORE:	store_true <= 1'b1;
+			5'h09:	store_true <= 1'b1;
 
-                // ADD
-                5'h01: begin
-                    add_op_true      <= 1'b1;
-                    write_to_regfile <= 1'b1;
-                end
-            
-                // SUB (add with operand2 complemented + carry)
-                5'h02: begin
-                    add_op_true       <= 1'b1;
-                    en_op2_complement <= 1'b1;
-                    carry_in          <= 1'b1;
-                    write_to_regfile  <= 1'b1;
-                end
-            
-                // AND
-                5'h03: begin
-                    and_op_true       <= 1'b1;
-                    lgcl_or_bitwse_T  <= 1'b1;
-                    write_to_regfile  <= 1'b1;
-                end
-            
-                // OR
-                5'h04: begin
-                    or_op_true        <= 1'b1;
-                    lgcl_or_bitwse_T  <= 1'b1;
-                    write_to_regfile  <= 1'b1;
-                end
-            
-                // NOT
-                5'h05: begin
-                    not_op_true       <= 1'b1;
-                    lgcl_or_bitwse_T  <= 1'b1;
-                    write_to_regfile  <= 1'b1;
-                end
-            
-                // Shift Left
-                5'h06: begin
-                    shift_left_true   <= 1'b1;
-                    write_to_regfile  <= 1'b1;
-                end
-            
-                // Jump
-                5'h07: begin
-                    nxt_prog_ctr       <= branch_addr;
-                    jump_true          <= 1'b1;
-                    unconditional_jump <= 1'b1;
-                end
-            
-                // Load
-                5'h08: begin
-                    load_true         <= 1'b1;
-                    write_to_regfile  <= 1'b1;
-                end
-            
-                // Store
-                5'h09: begin
-                    store_true        <= 1'b1;
-                end
-            
-                // Bitwise AND/OR/NOT
-                5'h0A: begin
-                    and_bitwise_true  <= 1'b1;
-                    lgcl_or_bitwse_T  <= 1'b1;
-                    write_to_regfile  <= 1'b1;
-                end
-            
-                5'h0B: begin
-                    or_bitwise_true   <= 1'b1;
-                    lgcl_or_bitwse_T  <= 1'b1;
-                    write_to_regfile  <= 1'b1;
-                end
-            
-                5'h0C: begin
-                    not_bitwise_true  <= 1'b1;
-                    lgcl_or_bitwse_T  <= 1'b1;
-                    write_to_regfile  <= 1'b1;
-                end
-            
-                // Compare (subtract, set flags only)
-                5'h0D: begin
-                    add_op_true       <= 1'b1;
-                    en_op2_complement <= 1'b1;
-                    carry_in          <= 1'b1;
-                    compare_true      <= 1'b1;
-                end
-            
-                // Conditional jumps
-                5'h0E: begin
-                    nxt_prog_ctr  <= branch_addr;
-                    jump_true     <= 1'b1;
-                    jump_gt       <= 1'b1;
-                end
-            
-                5'h0F: begin
-                    nxt_prog_ctr  <= branch_addr;
-                    jump_true     <= 1'b1;
-                    jump_lt       <= 1'b1;
-                end
-            
-                5'h10: begin
-                    nxt_prog_ctr  <= branch_addr;
-                    jump_true     <= 1'b1;
-                    jump_eq       <= 1'b1;
-                end
-            
-                5'h11: begin
-                    nxt_prog_ctr  <= branch_addr;
-                    jump_true     <= 1'b1;
-                    jump_carry    <= 1'b1;
-                end
-            
-                default: begin
-                    // NOP: all control signals remain zero
-                end
-            
-            endcase
+		//	OP_ANDBIT:	begin
+			5'h0a:	begin
+					and_bitwise_true <= 1'b1;
+					lgcl_or_bitwse_T <= 1'b1;
+					write_to_regfile <= 1'b1; 
+			   		end
+
+		//	OP_ORBIT:	begin
+			5'h0b:	begin
+					or_bitwise_true <= 1'b1;
+					lgcl_or_bitwse_T <= 1'b1;
+					write_to_regfile <= 1'b1;
+					end
+
+		//	OP_NOTBIT:	begin
+			5'h0c:	begin
+					not_bitwise_true <= 1'b1;
+					lgcl_or_bitwse_T <= 1'b1;
+					write_to_regfile <= 1'b1;
+					end
+ 
+		//	OP_COMPARE: begin
+			5'h0d:	begin
+					add_op_true <= 1'b1;
+					compare_true <= 1'b1;	
+					carry_in	<= 1'b1;   //subtract
+					en_op2_complement <= 1'b1;
+				   	end
+
+		//	OP_JMPGT:	begin
+			5'h0e:	begin
+					nxt_prog_ctr <= branch_addr;
+					jump_true	<= 1'b1;
+					jump_gt <= 1'b1;
+					end
+
+		//	OP_JMPLT:	begin
+			5'h0f:	begin
+					nxt_prog_ctr <= branch_addr;
+					jump_true	<= 1'b1;
+					jump_lt <= 1'b1;
+					end
+		//	OP_JMPEQ:	begin
+			5'h10:	begin
+					nxt_prog_ctr <= branch_addr;
+					jump_true	<= 1'b1;
+					jump_eq <= 1'b1;
+					end
+
+		//	OP_JMPC:	begin
+			5'h11:	begin
+					nxt_prog_ctr <= branch_addr;
+					jump_true	<= 1'b1;
+					jump_carry <= 1'b1;
+					end
+
+			default: 	;			//= NOP
+			endcase
 		end
-
 	
 
 
@@ -791,26 +774,6 @@ always @(posedge clk)
 //
 //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-//-----------------------------------------------
-// DECODE LOGIC ASSERTIONS
-//-----------------------------------------------
-a_branch_addr_range: assert property (@(posedge clk)
-    opcode == OPCODE_BRANCH |-> branch_addr < 1024
-);
-
-a_load_addr_range: assert property (@(posedge clk)
-    opcode == OPCODE_LOAD |-> ld_mem_addr inside {[0:255]}
-);
-
-a_store_addr_range: assert property (@(posedge clk)
-    opcode == OPCODE_STORE |-> st_mem_addr inside {[0:255]}
-);
-
-
-//-----------------------------------------------
-// OPCODE ASSERTIONS
-//-----------------------------------------------
-
 localparam [4:0] OPC_NOP      = 5'h00;
 localparam [4:0] OPC_ADD      = 5'h01;
 localparam [4:0] OPC_SUB      = 5'h02;
@@ -829,6 +792,27 @@ localparam [4:0] OPC_JMPGT    = 5'h0e;
 localparam [4:0] OPC_JMPLT    = 5'h0f;
 localparam [4:0] OPC_JMPEQ    = 5'h10;
 localparam [4:0] OPC_JMPC     = 5'h11;
+//-----------------------------------------------
+// DECODE LOGIC ASSERTIONS
+//-----------------------------------------------
+
+//a_branch_addr_range: assert property (@(posedge clk)
+//    opcode == OPCODE_BRANCH |-> branch_addr < 1024
+//);
+
+a_load_addr_range: assert property (@(posedge clk)
+    opcode == OPC_LOAD |-> ld_mem_addr inside {[0:255]}
+);
+
+a_store_addr_range: assert property (@(posedge clk)
+    opcode == OPC_STORE |-> st_mem_addr inside {[0:255]}
+);
+
+
+//-----------------------------------------------
+// OPCODE ASSERTIONS
+//-----------------------------------------------
+
 
 // Ensure with assume assert that opcode follows the RISC protocol
 s_valid_opcode: assume property ( @(posedge clk) 
