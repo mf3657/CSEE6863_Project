@@ -46,7 +46,7 @@ module register_file (clk, reset,
 a_succesfull_write: assert property (@(posedge clk)
 									 wr_en |-> ##1 (reg_file[wr_addr] == $past(wr_data)));
 // Ensure stable memory when wr_en low
-a_succesfull_write: assert property (@(posedge clk)
+a_register_stability: assert property (@(posedge clk)
 									 !wr_en ##1 !wr_en |-> (reg_file[wr_addr] == $past(reg_file[wr_addr])));
 // Ensure wr_addr is stable during write
 a_wr_addr_stable_during_write: assert property (@(posedge clk)
