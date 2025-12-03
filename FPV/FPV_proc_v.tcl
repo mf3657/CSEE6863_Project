@@ -9,7 +9,7 @@
 # Analyze design under verifcation files
 set ROOT_PATH ../design
 
-analyze -sv \
+analyze -sv -define FORMAL \
 	${ROOT_PATH}/processor_top.v \
 	${ROOT_PATH}/processor_core.v \
 	${ROOT_PATH}/instr_and_data_mem.v \

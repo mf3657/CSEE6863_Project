@@ -65,11 +65,9 @@ a_read_port2_correct: assert property (@(posedge clk)
 //--------------------
 // ASSUME PROPERTIES
 //--------------------
-// Assume valid addresing
-s_valid_addresses: assume property (@(posedge clk)
-								    (rd_addr1 inside {[0:7]}) &&
-								    (rd_addr2 inside {[0:7]}) &&
-								    (wr_addr  inside {[0:7]}));
+
+
+										
 //--------------------
 // COVER PROPERTIES
 //--------------------
