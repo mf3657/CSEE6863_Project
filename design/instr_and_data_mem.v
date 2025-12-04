@@ -1,3 +1,4 @@
+`define FORMAL
 module instr_and_data_mem (clk, 
 						   prog_ctr, instr_mem_out,
 						   data_rd_addr, data_wr_addr,
@@ -24,7 +25,6 @@ module instr_and_data_mem (clk,
 	`ifdef FORMAL
     	// JasperGold chooses any instruction each cycle
     	(* anyconst *) reg [15:0] instr_sym;
-		always @(posedge clk) restrict($stable(instr_sym));
 
     	always @(posedge clk)
     	    instr_mem_out <= #1 instr_sym;
@@ -43,7 +43,6 @@ module instr_and_data_mem (clk,
 	`ifdef FORMAL
 		// JasperGold chooses any data value each cycle
 	    (* anyconst *) reg [7:0] data_sym;
-		always @(data_rd_addr) restrict($stable(data_sym));
 
 	    always @(data_rd_addr) 
 			datamem_rd_data <= data_sym;
@@ -86,7 +85,7 @@ module instr_and_data_mem (clk,
 //--------------------
 
 // read after writes are fine, just not in the same damn cycle.
-s_no_same_cycle_r_w: assume property (@(posedge clk) (!(store_to_mem && data_rd_addr == data_wr_addr));)
+s_no_same_cycle_r_w: assume property (@(posedge clk) (!(store_to_mem && data_rd_addr == data_wr_addr)));
 
 //--------------------
 // COVER PROPERTIES

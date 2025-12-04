@@ -48,7 +48,6 @@ module processor_core (clk, reset,
 	wire		gt_flag_true, lt_flag_true, eq_flag_true;
 	wire		carry_flag_true;
 
-	reg [9:0] branch_addr,prog_ctr,nxt_prog_ctr;
 	reg [9:0] nxt_prog_ctr_reg, nxt_prog_ctr_r2;
 	reg [7:0] op1_data_reg, op2_data_reg; 
 	reg [15:0] instruction;

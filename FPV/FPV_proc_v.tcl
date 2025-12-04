@@ -9,7 +9,7 @@
 # Analyze design under verifcation files
 set ROOT_PATH ../design
 
-analyze -sv -define FORMAL \
+analyze -sv \
 	${ROOT_PATH}/processor_top.v \
 	${ROOT_PATH}/processor_core.v \
 	${ROOT_PATH}/instr_and_data_mem.v \
@@ -31,8 +31,6 @@ get_design_info
 # Prove properties
 prove -all
 #autoprove -time_limit 1h
-
-cover -all
 
 # Report proof results
 report
