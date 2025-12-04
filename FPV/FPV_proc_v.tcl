@@ -32,6 +32,8 @@ get_design_info
 prove -all
 #autoprove -time_limit 1h
 
+cover -all
+
 # Report proof results
 report
 

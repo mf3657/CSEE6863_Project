@@ -8,7 +8,7 @@ module register_file (clk, reset,
 	input clk, reset;
 	input [7:0] wr_data;
 	input [2:0] rd_addr1, rd_addr2, wr_addr;
-	input		 wr_en;
+	input		wr_en;
 	output[7:0] rd_data1, rd_data2;
 
 	reg [7:0] rd_data1, rd_data2;
