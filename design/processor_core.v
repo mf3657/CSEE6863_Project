@@ -48,7 +48,6 @@ module processor_core (clk, reset,
 	wire		gt_flag_true, lt_flag_true, eq_flag_true;
 	wire		carry_flag_true;
 
-	reg [9:0] branch_addr,prog_ctr,nxt_prog_ctr;
 	reg [9:0] nxt_prog_ctr_reg, nxt_prog_ctr_r2;
 	reg [7:0] op1_data_reg, op2_data_reg; 
 	reg [15:0] instruction;
@@ -764,7 +763,7 @@ always @(posedge clk)
 
 //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 //
-// ASSERTIONS FOR PROCESSOR_CORE
+// PROPERTIES FOR PROCESSOR_CORE
 //	- a_* = assert
 //	- c_* = cover
 //	- s_* = assume
@@ -789,55 +788,244 @@ localparam [4:0] OPC_JMPGT    = 5'h0e;
 localparam [4:0] OPC_JMPLT    = 5'h0f;
 localparam [4:0] OPC_JMPEQ    = 5'h10;
 localparam [4:0] OPC_JMPC     = 5'h11;
+
 //-----------------------------------------------
-// DECODE LOGIC ASSERTIONS
+// DECODE + CONTROL LOGIC PROPERTIES
 //-----------------------------------------------
 
-//a_branch_addr_range: assert property (@(posedge clk)
-//    opcode == OPCODE_BRANCH |-> branch_addr < 1024
-//);
+// Most control signals are low on NOP
+a_nop_has_no_side_effects: assert property ( @(posedge clk)
+    opcode == OPC_NOP |->
+		!add_op_true && !and_op_true && !or_op_true && !not_op_true &&
+		!shift_left_true &&
+		!load_true && !store_true &&
+		!and_bitwise_true && !or_bitwise_true && !not_bitwise_true &&
+		!compare_true &&
+		!jump_true && !unconditional_jump &&
+		!write_to_regfile
+);
 
-a_load_addr_range: assert property (@(posedge clk)
+// For ADD: only ADD-related controls are active
+a_add_decode: assert property ( @(posedge clk)
+    opcode == OPC_ADD |->
+    add_op_true &&
+    !en_op2_complement &&
+    !carry_in &&
+    write_to_regfile &&
+    !load_true && !store_true &&
+    !shift_left_true &&
+    !compare_true &&
+    !jump_true
+);
+
+// For SUB: ADD with complement and carry_in
+a_sub_decode: assert property ( @(posedge clk)
+    opcode == OPC_SUB |->
+    add_op_true &&
+    en_op2_complement &&
+    carry_in &&
+    write_to_regfile &&
+    !load_true && !store_true &&
+    !compare_true &&
+    !jump_true
+);
+
+// For LOAD: no ALU op, load_true, writes to regfile
+a_load_decode: assert property ( @(posedge clk)
+    opcode == OPC_LOAD |->
+    load_true &&
+    write_to_regfile &&
+    !store_true &&
+    !add_op_true && !shift_left_true &&
+    !jump_true &&
+    !compare_true
+);
+
+a_load_addr_range: assert property ( @(posedge clk)
     opcode == OPC_LOAD |-> ld_mem_addr inside {[0:255]}
 );
 
-a_store_addr_range: assert property (@(posedge clk)
+
+// For STORE: store_true only, no regfile write
+a_store_decode: assert property ( @(posedge clk)
+    opcode == OPC_STORE |->
+    store_true &&
+    !load_true &&
+    !write_to_regfile
+);
+
+a_store_addr_range: assert property ( @(posedge clk)
     opcode == OPC_STORE |-> st_mem_addr inside {[0:255]}
 );
 
 
+// For unconditional jump
+a_jmp_decode: assert property ( @(posedge clk)
+    opcode == OPC_JMP |->
+    jump_true &&
+    unconditional_jump &&
+    !jump_gt && !jump_lt && !jump_eq && !jump_carry
+);
+
+// Mutually exclusive branch-type flags
+a_branch_type_onehot0: assert property  (@(posedge clk)
+    $onehot0({unconditional_jump, jump_gt, jump_lt, jump_eq, jump_carry})
+);
+
+// Only one class of operation at a time (ALU vs load/store)
+a_main_op_classes_mutually_exclusive: assert property ( @(posedge clk)
+    $onehot0({
+        add_op_true,
+        and_op_true || or_op_true || not_op_true ||
+            and_bitwise_true || or_bitwise_true || not_bitwise_true,
+        shift_left_true,
+        load_true,
+        store_true,
+        compare_true,
+        jump_true
+    })
+);
+
+
 //-----------------------------------------------
-// OPCODE ASSERTIONS
+// OPCODE PROPERTIES
 //-----------------------------------------------
 
 
 // Ensure with assume assert that opcode follows the RISC protocol
 s_valid_opcode: assume property ( @(posedge clk) 
-								opcode inside {
-									OPC_NOP,
-									OPC_ADD,
-									OPC_SUB,
-									OPC_AND,
-									OPC_OR,
-									OPC_NOT,
-									OPC_SHIFT,
-									OPC_JMP,
-									OPC_LOAD,
-									OPC_STORE,
-									OPC_ANDBIT,
-									OPC_ORBIT,
-									OPC_NOTBIT,
-									OPC_COMPARE,
-									OPC_JMPGT,
-									OPC_JMPLT,
-									OPC_JMPEQ,
-									OPC_JMPC
-								} );
+		opcode inside {
+			OPC_NOP,
+			OPC_ADD, OPC_SUB,
+			OPC_AND, OPC_OR, OPC_NOT,
+			OPC_SHIFT,
+			OPC_JMP,
+			OPC_LOAD, OPC_STORE,
+			OPC_ANDBIT, OPC_ORBIT,OPC_NOTBIT,
+			OPC_COMPARE,
+			OPC_JMPGT, OPC_JMPLT, OPC_JMPEQ, OPC_JMPC
+		}
+);
 
 //-----------------------------------------------
-// PROGRAM COUNTER ASSERTIONS
+// PROGRAM COUNTER PROPERTIES
 //-----------------------------------------------
 s_valid_pc : assume property (@(posedge clk) prog_ctr < 1024);
+
+
+//-----------------------------------------------
+// INPUT PROPERTIES
+//-----------------------------------------------
+
+s_no_x_inputs: assume property (@(posedge clk)
+    !$isunknown({op1_rd_data, op2_rd_data, datamem_rd_data})
+);
+
+
+//-----------------------------------------------
+// BYPASS PROPERTIES
+//-----------------------------------------------
+
+// Decode-stage bypass: op_data chooses datamem_wr_data
+a_bypass_dec_op1: assert property ( @(posedge clk)
+    bypass_op1_dcd_stage |-> op1_data == datamem_wr_data
+);
+
+a_bypass_dec_op2: assert property ( @(posedge clk)
+    bypass_op2_dcd_stage |-> op2_data == datamem_wr_data
+);
+
+// Execute-stage bypass: operand chooses datamem_wr_data
+a_bypass_ex_op1: assert property ( @(posedge clk)
+    bypass_op1_ex_stage |-> operand1 == datamem_wr_data
+);
+
+a_bypass_ex_op2: assert property ( @(posedge clk)
+    bypass_op2_ex_stage |-> operand2 == datamem_wr_data
+);
+
+// When bypass is NOT active, data comes straight from regfile / decode regs
+a_op1_no_bypass_paths: assert property ( @(posedge clk)
+    !bypass_op1_dcd_stage && !bypass_op1_ex_stage |->
+    operand1 == op1_data_reg
+);
+
+a_op2_no_bypass_paths: assert property ( @(posedge clk)
+    !bypass_op2_dcd_stage && !bypass_op2_ex_stage |->
+    operand2 == op2_data_reg
+);
+
+
+//-----------------------------------------------
+// ALU PROPERTIES
+//-----------------------------------------------
+
+
+// ALU is purely a combinational add with carry
+a_alu_add_definition: assert property ( @(posedge clk)
+    {alu_carry_out, alu_data_out} == (data_in1 + data_in2 + carry_in_reg)
+);
+
+// Compare flags mutually exclusive
+a_compare_flags_mutually_exclusive: assert property ( @(posedge clk)
+    (gt_flag_ex + lt_flag_ex + eq_flag_ex) <= 1
+);
+
+// When eq_flag_ex is set, result must be zero
+a_eq_flag_result_zero: assert property ( @(posedge clk)
+    eq_flag_ex |-> alu_data_out == 8'h00
+);
+
+// gt/lt require non-zero
+a_gt_lt_result_nonzero: assert property ( @(posedge clk)
+    (gt_flag_ex || lt_flag_ex) |-> alu_data_out != 8'h00
+);
+
+// Carry flag is updated only when save_carry_flag is true and not invalidated
+a_carry_write_guarded: assert property ( @(posedge clk)
+    (save_carry_flag_reg && !invalidate_instr) |-> $changed(carry_flag)
+);
+
+// If no carry write is allowed, carry_flag must hold its value
+a_carry_stable_when_not_saving: assert property ( @(posedge clk)
+    !(save_carry_flag_reg && !invalidate_instr) |-> $stable(carry_flag)
+);
+
+
+//-----------------------------------------------
+// SANITY CHECK COVER PROPERTIES
+//-----------------------------------------------
+
+
+// See at least one ADD followed by a STORE
+c_add_then_store: cover property ( @(posedge clk)
+    opcode == OPC_ADD ##1 opcode == OPC_STORE
+);
+
+// See a compare that actually sets gt, lt, and eq at least once
+c_compare_gt: cover property ( @(posedge clk)
+    compare_true_reg && gt_flag_ex
+);
+
+c_compare_lt: cover property ( @(posedge clk)
+    compare_true_reg && lt_flag_ex
+);
+
+c_compare_eq: cover property ( @(posedge clk)
+    compare_true_reg && eq_flag_ex
+);
+
+// See a taken branch to a non-zero target
+c_taken_branch: cover property ( @(posedge clk)
+    branch_taken_reg && nxt_prog_ctr_r2 != 10'd0
+);
+
+// See a LOAD immediately followed by an ALU op that bypasses it
+c_load_use_bypass: cover property ( @(posedge clk)
+    opcode == OPC_LOAD ##1
+    (opcode inside {OPC_ADD, OPC_SUB, OPC_AND, OPC_OR, OPC_ANDBIT, OPC_ORBIT} &&
+     (bypass_op1_dcd_stage || bypass_op2_dcd_stage))
+);
 
 
 
